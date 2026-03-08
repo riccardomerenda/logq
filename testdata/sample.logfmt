@@ -1,0 +1,6 @@
+ts=2026-03-08T10:00:01Z level=info service=api msg="request started" method=GET path=/users request_id=abc123
+ts=2026-03-08T10:00:01Z level=info service=api msg="request completed" method=GET path=/users request_id=abc123 latency=45
+ts=2026-03-08T10:00:02Z level=error service=auth msg="token expired" user_id=u_882 request_id=def456 latency=12
+ts=2026-03-08T10:00:03Z level=warn service=db msg="slow query" query="SELECT * FROM orders" latency=1523 rows=4200
+ts=2026-03-08T10:00:03Z level=info service=api msg="health check ok" latency=2
+ts=2026-03-08T10:00:04Z level=error service=api msg="connection refused" target=payments-service retries=3 request_id=ghi789

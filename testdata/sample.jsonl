@@ -1,0 +1,20 @@
+{"timestamp":"2026-03-08T10:00:01Z","level":"info","service":"api","message":"request started","method":"GET","path":"/users","request_id":"abc123"}
+{"timestamp":"2026-03-08T10:00:01Z","level":"info","service":"api","message":"request completed","method":"GET","path":"/users","request_id":"abc123","latency":45}
+{"timestamp":"2026-03-08T10:00:02Z","level":"error","service":"auth","message":"token expired","user_id":"u_882","request_id":"def456","latency":12}
+{"timestamp":"2026-03-08T10:00:03Z","level":"warn","service":"db","message":"slow query","query":"SELECT * FROM orders","latency":1523,"rows":4200}
+{"timestamp":"2026-03-08T10:00:03Z","level":"info","service":"api","message":"health check ok","latency":2}
+{"timestamp":"2026-03-08T10:00:04Z","level":"error","service":"api","message":"connection refused","target":"payments-service","retries":3,"request_id":"ghi789"}
+{"timestamp":"2026-03-08T10:00:05Z","level":"info","service":"auth","message":"login successful","user_id":"u_441","method":"oauth","latency":89}
+{"timestamp":"2026-03-08T10:00:06Z","level":"debug","service":"cache","message":"cache hit","key":"user:u_441:profile","ttl":3600}
+{"timestamp":"2026-03-08T10:00:06Z","level":"info","service":"api","message":"request started","method":"POST","path":"/orders","request_id":"jkl012"}
+{"timestamp":"2026-03-08T10:00:07Z","level":"warn","service":"api","message":"rate limit approaching","client_ip":"192.168.1.42","current_rate":95,"limit":100}
+{"timestamp":"2026-03-08T10:00:08Z","level":"info","service":"api","message":"request completed","method":"POST","path":"/orders","request_id":"jkl012","latency":234}
+{"timestamp":"2026-03-08T10:00:09Z","level":"error","service":"db","message":"deadlock detected","table":"inventory","retries":2,"latency":5012}
+{"timestamp":"2026-03-08T10:00:10Z","level":"info","service":"api","message":"request started","method":"GET","path":"/products","request_id":"mno345"}
+{"timestamp":"2026-03-08T10:00:10Z","level":"debug","service":"cache","message":"cache miss","key":"products:featured","ttl":0}
+{"timestamp":"2026-03-08T10:00:11Z","level":"info","service":"api","message":"request completed","method":"GET","path":"/products","request_id":"mno345","latency":156}
+{"timestamp":"2026-03-08T10:00:12Z","level":"warn","service":"auth","message":"suspicious login attempt","user_id":"u_993","client_ip":"10.0.0.99","attempts":4}
+{"timestamp":"2026-03-08T10:00:13Z","level":"info","service":"api","message":"health check ok","latency":1}
+{"timestamp":"2026-03-08T10:00:14Z","level":"error","service":"api","message":"upstream timeout","target":"recommendation-service","timeout_ms":5000,"request_id":"pqr678"}
+{"timestamp":"2026-03-08T10:00:15Z","level":"info","service":"api","message":"request started","method":"DELETE","path":"/users/u_112","request_id":"stu901"}
+{"timestamp":"2026-03-08T10:00:15Z","level":"fatal","service":"db","message":"connection pool exhausted","active_connections":50,"max_connections":50}

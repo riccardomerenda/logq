@@ -1,0 +1,5 @@
+{"timestamp":"2026-03-08T10:00:01Z","level":"info","message":"valid line"}
+{broken json here
+{"timestamp":"2026-03-08T10:00:02Z","level":"error","message":"another valid line"}
+not json at all, just plain text
+{"timestamp":"2026-03-08T10:00:03Z","level":"warn","message":"valid again","nested":{"key":"value"}}
