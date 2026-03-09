@@ -193,6 +193,66 @@ func (idx *Index) numericRangeLess(field string, max float64, includeMax bool) [
 	return result
 }
 
+// TimeAfter returns record IDs where timestamp > t.
+func (idx *Index) TimeAfter(t time.Time) []int {
+	if len(idx.timeIndex) == 0 {
+		return nil
+	}
+	lo := sort.Search(len(idx.timeIndex), func(i int) bool {
+		return idx.timeIndex[i].Time.After(t)
+	})
+	var result []int
+	for i := lo; i < len(idx.timeIndex); i++ {
+		result = append(result, idx.timeIndex[i].RecordID)
+	}
+	return result
+}
+
+// TimeAfterEqual returns record IDs where timestamp >= t.
+func (idx *Index) TimeAfterEqual(t time.Time) []int {
+	if len(idx.timeIndex) == 0 {
+		return nil
+	}
+	lo := sort.Search(len(idx.timeIndex), func(i int) bool {
+		return !idx.timeIndex[i].Time.Before(t)
+	})
+	var result []int
+	for i := lo; i < len(idx.timeIndex); i++ {
+		result = append(result, idx.timeIndex[i].RecordID)
+	}
+	return result
+}
+
+// TimeBefore returns record IDs where timestamp < t.
+func (idx *Index) TimeBefore(t time.Time) []int {
+	if len(idx.timeIndex) == 0 {
+		return nil
+	}
+	lo := sort.Search(len(idx.timeIndex), func(i int) bool {
+		return !idx.timeIndex[i].Time.Before(t)
+	})
+	var result []int
+	for i := 0; i < lo; i++ {
+		result = append(result, idx.timeIndex[i].RecordID)
+	}
+	return result
+}
+
+// TimeBeforeEqual returns record IDs where timestamp <= t.
+func (idx *Index) TimeBeforeEqual(t time.Time) []int {
+	if len(idx.timeIndex) == 0 {
+		return nil
+	}
+	hi := sort.Search(len(idx.timeIndex), func(i int) bool {
+		return idx.timeIndex[i].Time.After(t)
+	})
+	var result []int
+	for i := 0; i < hi; i++ {
+		result = append(result, idx.timeIndex[i].RecordID)
+	}
+	return result
+}
+
 // TimeRange returns record IDs within [start, end].
 func (idx *Index) TimeRange(start, end time.Time) []int {
 	if len(idx.timeIndex) == 0 {

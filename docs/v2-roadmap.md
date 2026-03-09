@@ -27,12 +27,12 @@ All original 6 phases are shipped. logq is a working, interactive terminal log e
 ### Phase 7: Time Range Queries
 **Priority:** High — Infrastructure exists, just needs query syntax exposure
 **Effort:** Medium
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 The index already has `TimeRange(start, end)` with binary search. This phase exposes it to users via the query language.
 
 #### 7.1 — Time range operators in query syntax
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 Add support for these query patterns:
 ```
@@ -47,7 +47,7 @@ timestamp>"10:00" AND timestamp<"11:00" # time-only (relative to file's date)
 - `internal/index/index.go` — add `TimeBefore(t)`, `TimeAfter(t)` methods returning `[]int`
 
 #### 7.2 — Relative time shorthand
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 Add convenience syntax for common time filters:
 ```
@@ -63,7 +63,7 @@ last:2d          # last 2 days
 - `internal/query/evaluator.go` — resolve relative time against `time.Now()` and use time index
 
 #### 7.3 — Tests
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 - Parse `timestamp>"2026-03-08T10:00:00"` → correct AST with time comparison
 - Parse `last:5m` → correct relative time node
@@ -72,7 +72,7 @@ last:2d          # last 2 days
 - Combine with other queries: `level:error AND last:1h`
 
 #### 7.4 — Update query-syntax.md documentation
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 Add "Time Range Queries" section to `docs/query-syntax.md` with examples.
 

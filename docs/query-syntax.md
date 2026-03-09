@@ -90,6 +90,45 @@ level:error OR level:fatal AND service:api
 level:error OR (level:fatal AND service:api)
 ```
 
+## Time Range Queries
+
+Filter by timestamp using comparison operators on the `timestamp` field:
+
+```
+timestamp>"2026-03-08T10:00:00Z"                    # after a specific time
+timestamp<"2026-03-08T11:00:00Z"                    # before a specific time
+timestamp>="2026-03-08T10:00:00" AND timestamp<"2026-03-08T10:05:00"   # time window
+```
+
+All common timestamp formats are supported: RFC3339, ISO 8601, `YYYY-MM-DD HH:MM:SS`, and more.
+
+Field aliases `ts`, `time`, `@timestamp`, `datetime`, and `t` also work:
+
+```
+ts>"2026-03-08T10:00:00Z"
+@timestamp<="2026-03-08T12:00:00Z"
+```
+
+### Relative Time
+
+Use `last:` for quick time-based filtering relative to now:
+
+```
+last:5m                         # last 5 minutes
+last:1h                         # last 1 hour
+last:30s                        # last 30 seconds
+last:2d                         # last 2 days
+```
+
+Combine with other conditions:
+
+```
+level:error AND last:1h
+service:api AND last:30m AND latency>500
+```
+
+Supported units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days).
+
 ## Operator Precedence
 
 From highest to lowest:

@@ -1,6 +1,19 @@
 package query
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+// isTimestampField returns true if the field name refers to a timestamp.
+var timestampFields = map[string]bool{
+	"timestamp": true, "ts": true, "time": true, "@timestamp": true, "datetime": true, "t": true,
+}
+
+// durationRe matches relative time values like "5m", "1h", "30s", "2d".
+var durationRe = regexp.MustCompile(`^(\d+)([smhd])$`)
 
 // Parser is a recursive descent parser for query expressions.
 type Parser struct {
@@ -123,8 +136,20 @@ func (p *Parser) parsePrimary() (*Node, error) {
 
 			switch op.Value {
 			case ":":
+				// last:5m → relative time
+				if strings.ToLower(word.Value) == "last" {
+					dur, err := parseRelativeDuration(value.Value)
+					if err != nil {
+						return nil, fmt.Errorf("invalid duration %q: %v", value.Value, err)
+					}
+					return &Node{Type: NodeRelativeTime, Value: dur}, nil
+				}
 				return &Node{Type: NodeFieldMatch, Field: word.Value, Operator: ":", Value: value.Value}, nil
 			case ">", ">=", "<", "<=":
+				// timestamp>"..." → time comparison
+				if timestampFields[strings.ToLower(word.Value)] {
+					return &Node{Type: NodeTimeCompare, Field: word.Value, Operator: op.Value, Value: value.Value}, nil
+				}
 				return &Node{Type: NodeFieldCompare, Field: word.Value, Operator: op.Value, Value: value.Value}, nil
 			case "~":
 				return &Node{Type: NodeFieldRegex, Field: word.Value, Operator: "~", Value: value.Value}, nil
@@ -138,4 +163,18 @@ func (p *Parser) parsePrimary() (*Node, error) {
 	}
 
 	return nil, fmt.Errorf("unexpected token: %q", p.peek().Value)
+}
+
+// parseRelativeDuration parses "5m", "1h", "30s", "2d" into a duration string
+// that the evaluator will resolve against time.Now().
+func parseRelativeDuration(s string) (string, error) {
+	m := durationRe.FindStringSubmatch(s)
+	if m == nil {
+		return "", fmt.Errorf("expected format like 5m, 1h, 30s, 2d")
+	}
+	n, _ := strconv.Atoi(m[1])
+	if n <= 0 {
+		return "", fmt.Errorf("duration must be positive")
+	}
+	return s, nil
 }

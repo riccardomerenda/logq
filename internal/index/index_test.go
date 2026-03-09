@@ -283,3 +283,106 @@ func TestComplement(t *testing.T) {
 		}
 	}
 }
+
+// --- Time comparison index tests ---
+
+func TestTimeAfter(t *testing.T) {
+	records := makeRecords(20)
+	idx := Build(records)
+	// Records have timestamps 10:00:00 to 10:00:19
+	cutoff := time.Date(2026, 3, 8, 10, 0, 14, 0, time.UTC)
+
+	result := idx.TimeAfter(cutoff)
+	// Should match records 15-19 (strictly after 10:00:14)
+	if len(result) != 5 {
+		t.Errorf("TimeAfter returned %d, want 5", len(result))
+	}
+	for _, id := range result {
+		if !idx.Records[id].Timestamp.After(cutoff) {
+			t.Errorf("Record %d timestamp %v should be after %v", id, idx.Records[id].Timestamp, cutoff)
+		}
+	}
+}
+
+func TestTimeAfterEqual(t *testing.T) {
+	records := makeRecords(20)
+	idx := Build(records)
+	cutoff := time.Date(2026, 3, 8, 10, 0, 15, 0, time.UTC)
+
+	result := idx.TimeAfterEqual(cutoff)
+	// Should match records 15-19
+	if len(result) != 5 {
+		t.Errorf("TimeAfterEqual returned %d, want 5", len(result))
+	}
+	for _, id := range result {
+		if idx.Records[id].Timestamp.Before(cutoff) {
+			t.Errorf("Record %d timestamp %v should be >= %v", id, idx.Records[id].Timestamp, cutoff)
+		}
+	}
+}
+
+func TestTimeBefore(t *testing.T) {
+	records := makeRecords(20)
+	idx := Build(records)
+	cutoff := time.Date(2026, 3, 8, 10, 0, 5, 0, time.UTC)
+
+	result := idx.TimeBefore(cutoff)
+	// Should match records 0-4 (strictly before 10:00:05)
+	if len(result) != 5 {
+		t.Errorf("TimeBefore returned %d, want 5", len(result))
+	}
+	for _, id := range result {
+		if !idx.Records[id].Timestamp.Before(cutoff) {
+			t.Errorf("Record %d timestamp %v should be before %v", id, idx.Records[id].Timestamp, cutoff)
+		}
+	}
+}
+
+func TestTimeBeforeEqual(t *testing.T) {
+	records := makeRecords(20)
+	idx := Build(records)
+	cutoff := time.Date(2026, 3, 8, 10, 0, 4, 0, time.UTC)
+
+	result := idx.TimeBeforeEqual(cutoff)
+	// Should match records 0-4
+	if len(result) != 5 {
+		t.Errorf("TimeBeforeEqual returned %d, want 5", len(result))
+	}
+	for _, id := range result {
+		if idx.Records[id].Timestamp.After(cutoff) {
+			t.Errorf("Record %d timestamp %v should be <= %v", id, idx.Records[id].Timestamp, cutoff)
+		}
+	}
+}
+
+func TestTimeMethodsEmpty(t *testing.T) {
+	idx := Build(nil)
+
+	if len(idx.TimeAfter(time.Now())) != 0 {
+		t.Error("TimeAfter on empty index should return empty")
+	}
+	if len(idx.TimeAfterEqual(time.Now())) != 0 {
+		t.Error("TimeAfterEqual on empty index should return empty")
+	}
+	if len(idx.TimeBefore(time.Now())) != 0 {
+		t.Error("TimeBefore on empty index should return empty")
+	}
+	if len(idx.TimeBeforeEqual(time.Now())) != 0 {
+		t.Error("TimeBeforeEqual on empty index should return empty")
+	}
+}
+
+func TestTimeMethodsNoMatch(t *testing.T) {
+	records := makeRecords(10)
+	idx := Build(records)
+
+	future := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
+	past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if len(idx.TimeAfter(future)) != 0 {
+		t.Error("TimeAfter future should return empty")
+	}
+	if len(idx.TimeBefore(past)) != 0 {
+		t.Error("TimeBefore past should return empty")
+	}
+}

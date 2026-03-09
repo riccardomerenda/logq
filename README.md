@@ -121,6 +121,8 @@ Type queries in the filter bar (`/`). Results update live.
 | `field:value` | Exact match on a field | `level:error` |
 | `field>n` | Numeric comparison (`>`, `>=`, `<`, `<=`) | `latency>500` |
 | `field~"regex"` | Regex match | `message~"timeout.*retry"` |
+| `timestamp>"time"` | Time range (absolute) | `timestamp>"2026-03-08T10:00:00Z"` |
+| `last:duration` | Time range (relative to now) | `last:5m`, `last:1h`, `last:2d` |
 | `A AND B` | Both conditions must match | `level:error AND service:auth` |
 | `A OR B` | Either condition matches | `level:error OR level:fatal` |
 | `NOT A` | Negate a condition | `NOT service:healthcheck` |

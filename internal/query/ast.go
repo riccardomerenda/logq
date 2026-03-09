@@ -12,6 +12,8 @@ const (
 	NodeFieldRegex                  // field~"pattern"
 	NodeFullText                    // bare word full-text search
 	NodeMatchAll                    // empty query, matches everything
+	NodeTimeCompare                 // timestamp>"2026-03-08T10:00:00"
+	NodeRelativeTime                // last:5m, last:1h
 )
 
 // Node is a single node in the query AST.

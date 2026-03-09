@@ -323,3 +323,307 @@ func TestEvalRegex(t *testing.T) {
 		t.Errorf("Regex match returned %d, want 4", len(result))
 	}
 }
+
+// --- Time query tests ---
+
+func TestLexTimestampCompare(t *testing.T) {
+	tokens := Lex(`timestamp>"2026-03-08T10:00:05Z"`)
+	// word:timestamp, op:>, word:2026-03-08T10:00:05Z, EOF
+	if len(tokens) != 4 {
+		t.Fatalf("Expected 4 tokens, got %d: %+v", len(tokens), tokens)
+	}
+	if tokens[0].Value != "timestamp" {
+		t.Errorf("Token 0 = %q, want 'timestamp'", tokens[0].Value)
+	}
+	if tokens[1].Value != ">" {
+		t.Errorf("Token 1 = %q, want '>'", tokens[1].Value)
+	}
+	if tokens[2].Value != "2026-03-08T10:00:05Z" {
+		t.Errorf("Token 2 = %q, want '2026-03-08T10:00:05Z'", tokens[2].Value)
+	}
+}
+
+func TestLexLastRelative(t *testing.T) {
+	tokens := Lex("last:5m")
+	// word:last, op::, word:5m, EOF
+	if len(tokens) != 4 {
+		t.Fatalf("Expected 4 tokens, got %d: %+v", len(tokens), tokens)
+	}
+	if tokens[0].Value != "last" {
+		t.Errorf("Token 0 = %q, want 'last'", tokens[0].Value)
+	}
+	if tokens[1].Value != ":" {
+		t.Errorf("Token 1 = %q, want ':'", tokens[1].Value)
+	}
+	if tokens[2].Value != "5m" {
+		t.Errorf("Token 2 = %q, want '5m'", tokens[2].Value)
+	}
+}
+
+func TestParseTimestampGreater(t *testing.T) {
+	node, err := ParseQuery(`timestamp>"2026-03-08T10:00:05Z"`)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if node.Type != NodeTimeCompare {
+		t.Errorf("Type = %d, want NodeTimeCompare", node.Type)
+	}
+	if node.Operator != ">" {
+		t.Errorf("Operator = %q, want '>'", node.Operator)
+	}
+	if node.Value != "2026-03-08T10:00:05Z" {
+		t.Errorf("Value = %q, want '2026-03-08T10:00:05Z'", node.Value)
+	}
+}
+
+func TestParseTimestampLessEqual(t *testing.T) {
+	node, err := ParseQuery(`timestamp<="2026-03-08T10:00:10Z"`)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if node.Type != NodeTimeCompare {
+		t.Errorf("Type = %d, want NodeTimeCompare", node.Type)
+	}
+	if node.Operator != "<=" {
+		t.Errorf("Operator = %q, want '<='", node.Operator)
+	}
+}
+
+func TestParseTimestampAliases(t *testing.T) {
+	// All timestamp field aliases should produce NodeTimeCompare
+	aliases := []string{"timestamp", "ts", "time", "@timestamp", "datetime", "t"}
+	for _, alias := range aliases {
+		node, err := ParseQuery(fmt.Sprintf(`%s>"2026-03-08T10:00:00Z"`, alias))
+		if err != nil {
+			t.Fatalf("Parse error for %s: %v", alias, err)
+		}
+		if node.Type != NodeTimeCompare {
+			t.Errorf("%s: Type = %d, want NodeTimeCompare", alias, node.Type)
+		}
+	}
+}
+
+func TestParseLastRelative(t *testing.T) {
+	node, err := ParseQuery("last:5m")
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if node.Type != NodeRelativeTime {
+		t.Errorf("Type = %d, want NodeRelativeTime", node.Type)
+	}
+	if node.Value != "5m" {
+		t.Errorf("Value = %q, want '5m'", node.Value)
+	}
+}
+
+func TestParseLastVariousUnits(t *testing.T) {
+	cases := []string{"30s", "5m", "1h", "2d"}
+	for _, c := range cases {
+		node, err := ParseQuery("last:" + c)
+		if err != nil {
+			t.Fatalf("Parse error for last:%s: %v", c, err)
+		}
+		if node.Type != NodeRelativeTime {
+			t.Errorf("last:%s: Type = %d, want NodeRelativeTime", c, node.Type)
+		}
+		if node.Value != c {
+			t.Errorf("last:%s: Value = %q", c, node.Value)
+		}
+	}
+}
+
+func TestParseLastInvalid(t *testing.T) {
+	invalids := []string{"last:abc", "last:5x", "last:0m"}
+	for _, q := range invalids {
+		_, err := ParseQuery(q)
+		if err == nil {
+			t.Errorf("Expected error for %q", q)
+		}
+	}
+}
+
+func TestParseTimestampCompound(t *testing.T) {
+	node, err := ParseQuery(`level:error AND timestamp>"2026-03-08T10:00:05Z"`)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if node.Type != NodeAnd {
+		t.Fatalf("Type = %d, want NodeAnd", node.Type)
+	}
+	if node.Left.Type != NodeFieldMatch {
+		t.Errorf("Left type = %d, want NodeFieldMatch", node.Left.Type)
+	}
+	if node.Right.Type != NodeTimeCompare {
+		t.Errorf("Right type = %d, want NodeTimeCompare", node.Right.Type)
+	}
+}
+
+func TestParseTimestampRange(t *testing.T) {
+	node, err := ParseQuery(`timestamp>="2026-03-08T10:00:05Z" AND timestamp<"2026-03-08T10:00:15Z"`)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if node.Type != NodeAnd {
+		t.Fatalf("Type = %d, want NodeAnd", node.Type)
+	}
+	if node.Left.Type != NodeTimeCompare || node.Left.Operator != ">=" {
+		t.Errorf("Left: type=%d op=%q, want TimeCompare >=", node.Left.Type, node.Left.Operator)
+	}
+	if node.Right.Type != NodeTimeCompare || node.Right.Operator != "<" {
+		t.Errorf("Right: type=%d op=%q, want TimeCompare <", node.Right.Type, node.Right.Operator)
+	}
+}
+
+// --- Time evaluator tests ---
+
+func TestEvalTimestampGreater(t *testing.T) {
+	idx := makeTestIndex()
+	// Records have timestamps from 10:00:00 to 10:00:19 (1 per second)
+	node, _ := ParseQuery(`timestamp>"2026-03-08T10:00:14Z"`)
+	result := Evaluate(node, idx)
+
+	// Should match records 15-19 (timestamps 10:00:15 through 10:00:19)
+	if len(result) != 5 {
+		t.Errorf("timestamp>10:00:14 returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalTimestampGreaterEqual(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`timestamp>="2026-03-08T10:00:15Z"`)
+	result := Evaluate(node, idx)
+
+	// Should match records 15-19
+	if len(result) != 5 {
+		t.Errorf("timestamp>=10:00:15 returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalTimestampLess(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`timestamp<"2026-03-08T10:00:05Z"`)
+	result := Evaluate(node, idx)
+
+	// Should match records 0-4 (timestamps 10:00:00 through 10:00:04)
+	if len(result) != 5 {
+		t.Errorf("timestamp<10:00:05 returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalTimestampLessEqual(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`timestamp<="2026-03-08T10:00:04Z"`)
+	result := Evaluate(node, idx)
+
+	// Should match records 0-4
+	if len(result) != 5 {
+		t.Errorf("timestamp<=10:00:04 returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalTimestampRange(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`timestamp>="2026-03-08T10:00:05Z" AND timestamp<"2026-03-08T10:00:10Z"`)
+	result := Evaluate(node, idx)
+
+	// Should match records 5-9
+	if len(result) != 5 {
+		t.Errorf("timestamp range returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalTimestampWithOtherConditions(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`level:error AND timestamp>="2026-03-08T10:00:05Z"`)
+	result := Evaluate(node, idx)
+
+	for _, id := range result {
+		r := idx.Records[id]
+		if r.Level != "error" {
+			t.Errorf("Record %d: level=%q, want error", id, r.Level)
+		}
+		if r.Timestamp.Before(time.Date(2026, 3, 8, 10, 0, 5, 0, time.UTC)) {
+			t.Errorf("Record %d: timestamp %v should be >= 10:00:05", id, r.Timestamp)
+		}
+	}
+}
+
+func TestEvalRelativeTime(t *testing.T) {
+	idx := makeTestIndex()
+	// Records: 10:00:00 to 10:00:19
+	// Simulate "now" as 10:00:20, so last:10s = 10:00:10 to 10:00:20
+	now := time.Date(2026, 3, 8, 10, 0, 20, 0, time.UTC)
+
+	node, _ := ParseQuery("last:10s")
+	result := evaluateWithNow(node, idx, now)
+
+	// Should match records 10-19 (timestamps 10:00:10 through 10:00:19)
+	if len(result) != 10 {
+		t.Errorf("last:10s returned %d, want 10", len(result))
+	}
+}
+
+func TestEvalRelativeTimeSmall(t *testing.T) {
+	idx := makeTestIndex()
+	now := time.Date(2026, 3, 8, 10, 0, 20, 0, time.UTC)
+
+	node, _ := ParseQuery("last:5s")
+	result := evaluateWithNow(node, idx, now)
+
+	// last:5s from 10:00:20 = 10:00:15 to 10:00:20 → records 15-19
+	if len(result) != 5 {
+		t.Errorf("last:5s returned %d, want 5", len(result))
+	}
+}
+
+func TestEvalRelativeTimeWithCondition(t *testing.T) {
+	idx := makeTestIndex()
+	now := time.Date(2026, 3, 8, 10, 0, 20, 0, time.UTC)
+
+	node, _ := ParseQuery("level:error AND last:10s")
+	result := evaluateWithNow(node, idx, now)
+
+	for _, id := range result {
+		r := idx.Records[id]
+		if r.Level != "error" {
+			t.Errorf("Record %d: level=%q, want error", id, r.Level)
+		}
+		if r.Timestamp.Before(time.Date(2026, 3, 8, 10, 0, 10, 0, time.UTC)) {
+			t.Errorf("Record %d: timestamp %v too old for last:10s", id, r.Timestamp)
+		}
+	}
+}
+
+func TestEvalTimestampInvalidFormat(t *testing.T) {
+	idx := makeTestIndex()
+	node, _ := ParseQuery(`timestamp>"not-a-date"`)
+	result := Evaluate(node, idx)
+
+	if len(result) != 0 {
+		t.Errorf("Invalid timestamp should return 0 results, got %d", len(result))
+	}
+}
+
+func TestEvalTimestampNoMatches(t *testing.T) {
+	idx := makeTestIndex()
+	// All records are at 10:00:00-10:00:19, query for way in the future
+	node, _ := ParseQuery(`timestamp>"2099-01-01T00:00:00Z"`)
+	result := Evaluate(node, idx)
+
+	if len(result) != 0 {
+		t.Errorf("Expected 0 matches for future timestamp, got %d", len(result))
+	}
+}
+
+func TestEvalRelativeTimeLargeWindow(t *testing.T) {
+	idx := makeTestIndex()
+	now := time.Date(2026, 3, 8, 10, 0, 20, 0, time.UTC)
+
+	node, _ := ParseQuery("last:1h")
+	result := evaluateWithNow(node, idx, now)
+
+	// All 20 records are within last hour
+	if len(result) != 20 {
+		t.Errorf("last:1h returned %d, want 20", len(result))
+	}
+}
