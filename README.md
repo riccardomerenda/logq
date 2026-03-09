@@ -24,17 +24,17 @@
 ---
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ 10:00:01  ERROR  [auth]  token expired  user=u_882        │  Timeline      │
-│ 10:00:02  INFO   [api]   request ok  latency=45           │  10:00 ████ 12 │
-│ 10:00:03  ERROR  [api]   connection refused  retries=3    │  10:01 ██████ 8│
-│ 10:00:04  WARN   [db]    slow query  latency=1523         │  10:02 ████ 15 │
-│ 10:00:05  INFO   [auth]  login ok  method=oauth           │  10:03 ██    4 │
-├───────────────────────────────────────────────────────────┴────────────────┤
-│ Filter: level:error AND latency>500                                        │
-├────────────────────────────────────────────────────────────────────────────┤
-│ 47 matches / 12,302 total  │  query: 0.2ms  │  server.log (3.2MB)         │
-└────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------+------------------+
+| 10:00:01  ERROR  [auth]  token expired  user=u_882        |  Timeline        |
+| 10:00:02  INFO   [api]   request ok  latency=45           |  10:00 ####  12  |
+| 10:00:03  ERROR  [api]   connection refused  retries=3    |  10:01 ######  8 |
+| 10:00:04  WARN   [db]    slow query  latency=1523         |  10:02 ####  15  |
+| 10:00:05  INFO   [auth]  login ok  method=oauth           |  10:03 ##     4  |
++-----------------------------------------------------------+------------------+
+| Filter: level:error AND latency>500                                          |
++------------------------------------------------------------------------------+
+| 47 matches / 12,302 total  |  query: 0.2ms  |  server.log (3.2MB)           |
++------------------------------------------------------------------------------+
 ```
 
 ## Why logq?
@@ -189,25 +189,26 @@ For unstructured plain text logs, logq extracts:
 
 ```
   File / stdin / .gz
-        │
-        ▼
-   ┌─────────┐    ┌──────────┐    ┌─────────┐    ┌─────────┐    ┌───────────┐
-   │  Input   │───▶│ Multiline│───▶│ Parser  │───▶│  Index  │───▶│  Query    │
-   │  Reader  │    │ Grouper  │    │ JSON    │    │ Inverted│    │  Engine   │
-   │          │    │          │    │ logfmt  │    │ Numeric │    │  Lexer    │
-   │  gzip    │    │ auto-    │    │ plain   │    │ Time    │    │  Parser   │
-   └─────────┘    │ detect   │    └─────────┘    └─────────┘    │  Evaluator│
-                  └──────────┘                                   └─────┬─────┘
-                                                                       │
-                                                              ┌────────┴────────┐
-                                                              ▼                 ▼
-                                                        ┌───────────┐    ┌───────────┐
-                                                        │  TUI      │    │  Batch    │
-                                                        │  Log View │    │  Export   │
-                                                        │  Histogram│    │  raw/json │
-                                                        │  Query Bar│    │  csv      │
-                                                        │  Detail   │    │  stdout   │
-                                                        └───────────┘    └───────────┘
+        |
+        v
+  +---------+    +----------+    +---------+    +---------+    +-----------+
+  |  Input  |--->|Multiline |--->| Parser  |--->|  Index  |--->|  Query    |
+  |  Reader |    | Grouper  |    | JSON    |    | Inverted|    |  Engine   |
+  |         |    |          |    | logfmt  |    | Numeric |    |  Lexer    |
+  |  gzip   |    | auto-    |    | plain   |    | Time    |    |  Parser   |
+  +---------+    | detect   |    +---------+    +---------+    | Evaluator |
+                 +----------+                                  +-----+-----+
+                                                                     |
+                                                               +-----+-----+
+                                                               |           |
+                                                               v           v
+                                                          +---------+ +---------+
+                                                          |   TUI   | |  Batch  |
+                                                          |Log View | | Export  |
+                                                          |Histogram| |raw/json |
+                                                          |QueryBar | |  csv    |
+                                                          | Detail  | | stdout  |
+                                                          +---------+ +---------+
 ```
 
 **Performance by design:**
