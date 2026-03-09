@@ -31,3 +31,9 @@ dist/
 
 # Claude Code
 .claude/
+
+# Export files
+logq-export-*.jsonl
+
+# Backup files
+*~
