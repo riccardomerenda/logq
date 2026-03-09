@@ -7,6 +7,13 @@
     A fast, interactive terminal log explorer that treats your log files like a database.
   </p>
   <p align="center">
+    <a href="https://github.com/riccardomerenda/logq/actions/workflows/ci.yml"><img src="https://github.com/riccardomerenda/logq/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/riccardomerenda/logq/releases/latest"><img src="https://img.shields.io/github/v/release/riccardomerenda/logq?label=release&color=50FA7B" alt="Release"></a>
+    <a href="https://goreportcard.com/report/github.com/riccardomerenda/logq"><img src="https://goreportcard.com/badge/github.com/riccardomerenda/logq" alt="Go Report Card"></a>
+    <a href="https://github.com/riccardomerenda/logq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/riccardomerenda/logq?color=BD93F9" alt="License"></a>
+    <a href="https://pkg.go.dev/github.com/riccardomerenda/logq"><img src="https://pkg.go.dev/badge/github.com/riccardomerenda/logq.svg" alt="Go Reference"></a>
+  </p>
+  <p align="center">
     <a href="#install">Install</a> &middot;
     <a href="#quick-start">Quick Start</a> &middot;
     <a href="#query-syntax">Query Syntax</a> &middot;
