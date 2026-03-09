@@ -37,8 +37,9 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 **logq** changes that. Point it at a file (or pipe logs in) and get:
 
 - **Instant filtering** &#8212; type a query, results update as you type
+- **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
-- **Record detail** &#8212; press Enter to inspect any log line fully
+- **Record detail** &#8212; press Enter to inspect any log line, `c` to copy to clipboard
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text
 - **Single binary** &#8212; no dependencies, no config files, just run it
@@ -51,6 +52,16 @@ go install github.com/riccardomerenda/logq@latest
 
 # Or download a binary from GitHub Releases
 # https://github.com/riccardomerenda/logq/releases
+```
+
+### Updating
+
+```bash
+# If installed via go install
+logq update
+
+# Or manually
+go install github.com/riccardomerenda/logq@latest
 ```
 
 ## Quick Start
@@ -205,7 +216,8 @@ logq/
 ├── internal/
 │   ├── input/
 │   │   ├── reader.go           # File, stdin, gzip reading
-│   │   └── multiline.go        # Multi-line entry grouping
+│   │   ├── multiline.go        # Multi-line entry grouping
+│   │   └── follow.go           # File tailing for follow mode (-f)
 │   ├── parser/                 # JSON, logfmt, plain text, timestamps
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
