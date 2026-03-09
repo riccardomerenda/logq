@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/index"
@@ -21,6 +22,11 @@ func main() {
 
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
 		printUsage()
+		os.Exit(0)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		selfUpdate()
 		os.Exit(0)
 	}
 
@@ -82,6 +88,29 @@ func main() {
 	}
 }
 
+func selfUpdate() {
+	fmt.Printf("logq %s — checking for updates...\n", version)
+
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: Go is not installed. Install Go from https://go.dev or download a binary from:")
+		fmt.Fprintln(os.Stderr, "  https://github.com/riccardomerenda/logq/releases")
+		os.Exit(1)
+	}
+
+	cmd := exec.Command(goPath, "install", "github.com/riccardomerenda/logq@latest")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Println("Running: go install github.com/riccardomerenda/logq@latest")
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Updated successfully. Run 'logq --version' to check the new version.")
+}
+
 func printUsage() {
 	fmt.Printf(`logq %s — Fast, interactive log explorer for the terminal
 
@@ -89,6 +118,7 @@ Usage:
   logq <file>          Open a log file
   logq <file.gz>       Open a gzipped log file
   <cmd> | logq         Read from stdin pipe
+  logq update          Update to the latest version
 
 Options:
   -h, --help           Show this help
