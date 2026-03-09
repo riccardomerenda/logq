@@ -28,3 +28,6 @@ Thumbs.db
 
 # GoReleaser
 dist/
+
+# Claude Code
+.claude/
