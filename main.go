@@ -25,18 +25,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(os.Args) > 1 && os.Args[1] == "update" {
+	// Parse arguments
+	args := os.Args[1:]
+	follow := false
+	if len(args) > 0 && args[0] == "update" {
 		selfUpdate()
 		os.Exit(0)
+	}
+	if len(args) > 0 && args[0] == "-f" {
+		follow = true
+		args = args[1:]
 	}
 
 	var reader *input.Reader
 	var filename string
 	var fileSize string
+	var followOffset int64
 	var err error
 
-	if len(os.Args) > 1 {
-		path := os.Args[1]
+	if len(args) > 0 {
+		path := args[0]
 		reader, err = input.NewFileReader(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
@@ -47,10 +55,12 @@ func main() {
 
 		if info, e := os.Stat(path); e == nil {
 			fileSize = formatSize(info.Size())
+			followOffset = info.Size()
 		}
 	} else if input.IsStdinPipe() {
 		reader = input.NewStdinReader()
 		filename = "stdin"
+		follow = false // can't follow stdin
 	} else {
 		printUsage()
 		os.Exit(1)
@@ -80,6 +90,10 @@ func main() {
 
 	// Start TUI
 	model := ui.NewModel(idx, filename, fileSize)
+	if follow && len(args) > 0 {
+		fr := input.NewFollowReader(args[0], followOffset)
+		model.SetFollowReader(fr)
+	}
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if err := p.Start(); err != nil {
@@ -117,10 +131,12 @@ func printUsage() {
 Usage:
   logq <file>          Open a log file
   logq <file.gz>       Open a gzipped log file
+  logq -f <file>       Follow a growing file (like tail -f)
   <cmd> | logq         Read from stdin pipe
   logq update          Update to the latest version
 
 Options:
+  -f                   Follow mode — watch for new lines appended to the file
   -h, --help           Show this help
   -v, --version        Show version
 

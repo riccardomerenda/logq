@@ -12,6 +12,7 @@ type StatusBar struct {
 	queryTime  time.Duration
 	filename   string
 	fileSize   string
+	following  bool
 	width      int
 }
 
@@ -48,8 +49,12 @@ func (sb *StatusBar) View() string {
 			right += fmt.Sprintf(" (%s)", sb.fileSize)
 		}
 	}
+	follow := ""
+	if sb.following {
+		follow = "  [following]"
+	}
 	help := "  / filter  q quit"
 
-	content := left + middle + right + help
+	content := left + middle + right + follow + help
 	return StyleStatusBar.Width(sb.width).Render(content)
 }

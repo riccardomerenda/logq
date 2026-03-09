@@ -59,6 +59,9 @@ go install github.com/riccardomerenda/logq@latest
 # Explore a log file
 logq server.log
 
+# Follow a growing file (like tail -f, but interactive)
+logq -f /var/log/app.log
+
 # Pipe from anywhere
 kubectl logs myapp | logq
 docker logs mycontainer 2>&1 | logq
@@ -99,6 +102,7 @@ See the [full query reference](docs/query-syntax.md) for details.
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to start / end |
 | `Enter` | Show full record detail |
+| `c` | Copy raw record to clipboard (in detail view) |
 | `Escape` | Clear filter / close detail overlay |
 | `Tab` | Toggle focus between log view and histogram |
 | `q` | Quit |

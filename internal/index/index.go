@@ -96,6 +96,30 @@ func (idx *Index) addToIndex(r parser.Record, id int) {
 	}
 }
 
+// AddRecords appends new records to the index incrementally.
+func (idx *Index) AddRecords(records []parser.Record) {
+	startID := len(idx.Records)
+	idx.Records = append(idx.Records, records...)
+
+	for i, r := range records {
+		idx.addToIndex(r, startID+i)
+	}
+
+	// Re-sort numeric indices
+	for _, entries := range idx.numericIndex {
+		sort.Slice(entries, func(a, b int) bool {
+			return entries[a].Value < entries[b].Value
+		})
+	}
+
+	// Re-sort time index
+	sort.Slice(idx.timeIndex, func(a, b int) bool {
+		return idx.timeIndex[a].Time.Before(idx.timeIndex[b].Time)
+	})
+
+	idx.TotalCount = len(idx.Records)
+}
+
 // FieldLookup returns record IDs where field has the given value.
 func (idx *Index) FieldLookup(field, value string) []int {
 	if vals, ok := idx.fieldIndex[field]; ok {

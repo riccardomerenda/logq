@@ -11,9 +11,10 @@ import (
 
 // DetailView renders a full-screen overlay showing all fields of a record.
 type DetailView struct {
-	record *parser.Record
-	width  int
-	height int
+	record  *parser.Record
+	width   int
+	height  int
+	copyMsg string
 }
 
 // NewDetailView creates a new detail view.
@@ -84,7 +85,12 @@ func (d *DetailView) View() string {
 	}
 	b.WriteString(StyleDim.Render("  " + raw))
 	b.WriteString("\n\n")
-	b.WriteString(StyleDim.Render("  Press Escape to close"))
+	hint := "  Press Escape to close, c to copy raw"
+	if d.copyMsg != "" {
+		hint = "  " + d.copyMsg
+		d.copyMsg = ""
+	}
+	b.WriteString(StyleDim.Render(hint))
 
 	content := b.String()
 

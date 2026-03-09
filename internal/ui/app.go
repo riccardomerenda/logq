@@ -1,14 +1,27 @@
 package ui
 
 import (
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/riccardomerenda/logq/internal/index"
+	"github.com/riccardomerenda/logq/internal/input"
+	"github.com/riccardomerenda/logq/internal/parser"
 	"github.com/riccardomerenda/logq/internal/query"
 )
+
+// followTickMsg triggers a check for new file content.
+type followTickMsg time.Time
+
+// newRecordsMsg carries newly parsed records from follow mode.
+type newRecordsMsg struct {
+	records []parser.Record
+}
 
 // Focus tracks which panel has focus.
 type Focus int
@@ -43,6 +56,10 @@ type Model struct {
 	showDetail bool
 	filename   string
 	fileSize   string
+
+	// Follow mode
+	followReader *input.FollowReader
+	following    bool
 }
 
 // NewModel creates a new app model.
@@ -67,9 +84,24 @@ func NewModel(idx *index.Index, filename, fileSize string) Model {
 	return m
 }
 
+// SetFollowReader enables follow mode for tailing a file.
+func (m *Model) SetFollowReader(fr *input.FollowReader) {
+	m.followReader = fr
+	m.following = true
+}
+
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
+	if m.following {
+		return m.followTick()
+	}
 	return nil
+}
+
+func (m Model) followTick() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		return followTickMsg(t)
+	})
 }
 
 // Update implements tea.Model.
@@ -83,6 +115,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case followTickMsg:
+		return m.handleFollowTick()
+
+	case newRecordsMsg:
+		m.index.AddRecords(msg.records)
+		m.executeQuery()
+		return m, m.followTick()
 	}
 
 	// Pass through to query bar if focused
@@ -107,6 +147,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showDetail {
 		if key.Matches(msg, m.keys.Escape) {
 			m.showDetail = false
+		}
+		if key.Matches(msg, m.keys.Copy) {
+			if m.detail.record != nil {
+				if copyToClipboard(m.detail.record.Raw) == nil {
+					m.detail.copyMsg = "Copied!"
+				} else {
+					m.detail.copyMsg = "Copy failed"
+				}
+			}
 		}
 		return m, nil
 	}
@@ -254,6 +303,7 @@ func (m *Model) updateHistogram() {
 
 func (m *Model) updateStatusBar() {
 	m.statusBar.Update(len(m.results), m.index.TotalCount, m.queryTime, m.filename, m.fileSize)
+	m.statusBar.following = m.following
 }
 
 func (m *Model) updateLayout() {
@@ -275,6 +325,45 @@ func (m *Model) updateLayout() {
 	m.detail.SetSize(m.width, m.height)
 
 	m.updateHistogram()
+}
+
+func (m Model) handleFollowTick() (tea.Model, tea.Cmd) {
+	if m.followReader == nil {
+		return m, nil
+	}
+
+	lines, err := m.followReader.ReadNew()
+	if err != nil || len(lines) == 0 {
+		return m, m.followTick()
+	}
+
+	entries := input.GroupLines(lines)
+	records := make([]parser.Record, 0, len(entries))
+	for _, e := range entries {
+		records = append(records, parser.Parse(e.Text, e.LineNumber))
+	}
+
+	if len(records) == 0 {
+		return m, m.followTick()
+	}
+
+	return m, func() tea.Msg {
+		return newRecordsMsg{records: records}
+	}
+}
+
+func copyToClipboard(text string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("clip")
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	default:
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	}
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
 }
 
 // View implements tea.Model.
