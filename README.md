@@ -44,6 +44,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 **logq** changes that. Point it at a file (or pipe logs in) and get:
 
 - **Instant filtering** &#8212; type a query, results update as you type
+- **Multiple files** &#8212; `logq app.log db.log` merges files into a unified timeline, with `source:filename` queries
 - **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
 - **Record detail** &#8212; press Enter to inspect any log line, `c` to copy to clipboard
@@ -86,6 +87,9 @@ logq -f /var/log/app.log
 kubectl logs myapp | logq
 docker logs mycontainer 2>&1 | logq
 
+# Merge multiple files (sorted by timestamp)
+logq app.log db.log auth.log
+
 # Gzipped? No problem
 logq server.log.gz
 ```
@@ -111,6 +115,30 @@ logq server.log -q "level:error" --count
 
 In the TUI, press `s` to save the current filtered results to a file.
 
+## Multiple Files
+
+Open multiple files and logq merges them into a unified timeline sorted by timestamp:
+
+```bash
+# Merge multiple files
+logq app.log db.log auth.log
+
+# Mix plain and gzipped files
+logq app.log.1.gz app.log.2.gz app.log
+
+# Shell glob expansion works naturally
+logq /var/log/app/*.log
+```
+
+Each record gets a `source` field with the originating filename, so you can filter by file:
+
+```
+source:app.log AND level:error
+source~"auth.*" AND latency>500
+```
+
+The source file is shown as `<filename>` in the log view when multiple files are loaded.
+
 ## Query Syntax
 
 Type queries in the filter bar (`/`). Results update live.
@@ -126,6 +154,7 @@ Type queries in the filter bar (`/`). Results update live.
 | `A AND B` | Both conditions must match | `level:error AND service:auth` |
 | `A OR B` | Either condition matches | `level:error OR level:fatal` |
 | `NOT A` | Negate a condition | `NOT service:healthcheck` |
+| `source:filename` | Filter by source file (multi-file mode) | `source:app.log AND level:error` |
 | `(A OR B) AND C` | Group with parentheses | `(level:error OR level:fatal) AND service:api` |
 
 Compound queries work naturally:

@@ -20,9 +20,18 @@ All original 6 phases are shipped. logq is a working, interactive terminal log e
 | GoReleaser (cross-platform binaries) | Done |
 | README with badges, docs, query reference | Done |
 
+## v2 Features — Completed
+
+| Feature | Status |
+|---|---|
+| Time range queries (`timestamp>"..."`, `last:5m`) | Done (v0.4.0) |
+| Export & batch mode (`-q`, `-o`, `--format`, `--count`, `s` key) | Done (v0.4.0) |
+| Query history (Up/Down in filter bar, draft preservation) | Done (v0.4.0) |
+| Multiple file support (merged timeline, `source:filename`) | Done (v0.5.0) |
+
 ---
 
-## v2 Features
+## v2 Features — Planned
 
 ### Phase 7: Time Range Queries
 **Priority:** High — Infrastructure exists, just needs query syntax exposure
@@ -127,10 +136,10 @@ Add `s` key to save current filtered results to a file from within the TUI.
 ### Phase 9: Multiple File Support
 **Priority:** High — Very common real-world need
 **Effort:** Medium
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 #### 9.1 — Accept multiple file arguments
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 ```bash
 logq app.log db.log auth.log        # multiple explicit files
@@ -144,7 +153,7 @@ logq app.log.1.gz app.log.2.gz     # mixed gzip and plain
 - `internal/parser/parser.go` — add `Source` field to `Record` (filename origin)
 
 #### 9.2 — Merge and sort by timestamp
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 Records from multiple files should be interleaved by timestamp for a unified timeline.
 
@@ -153,7 +162,7 @@ Records from multiple files should be interleaved by timestamp for a unified tim
 - `internal/ui/logview.go` — show source file indicator: `[app.log]` prefix or color-coded
 
 #### 9.3 — Source file as queryable field
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 ```
 source:app.log AND level:error       # errors from specific file
@@ -165,7 +174,7 @@ source~"auth.*" AND latency>500      # from auth-related files
 - Index automatically picks it up (no index changes needed)
 
 #### 9.4 — Tests
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 - Two files with overlapping timestamps → merged in correct order
 - `source:filename` query works

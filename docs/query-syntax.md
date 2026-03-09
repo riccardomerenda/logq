@@ -167,6 +167,21 @@ message~"timeout" AND latency>500
 (level:error OR level:fatal) AND service~"payment.*"
 ```
 
+### Multi-file queries
+
+When opening multiple files, each record gets a `source` field with the originating filename:
+
+```
+# Errors from a specific file
+source:app.log AND level:error
+
+# Records from auth-related files (regex)
+source~"auth.*"
+
+# Combine source with other conditions
+source:db.log AND latency>500
+```
+
 ### Plain text / multi-line logs
 
 For unstructured logs (stack traces, application output, etc.), full-text search is the most useful:

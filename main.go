@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/index"
@@ -68,52 +70,63 @@ func main() {
 		}
 	}
 
-	var reader *input.Reader
+	var records []parser.Record
 	var filename string
 	var fileSize string
 	var followOffset int64
-	var err error
+	multiFile := len(fileArgs) > 1
 
 	if len(fileArgs) > 0 {
-		path := fileArgs[0]
-		reader, err = input.NewFileReader(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
-			os.Exit(1)
+		for _, path := range fileArgs {
+			recs, err := readFile(path, multiFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", path, err)
+				os.Exit(1)
+			}
+			records = append(records, recs...)
 		}
-		defer reader.Close()
-		filename = path
 
-		if info, e := os.Stat(path); e == nil {
-			fileSize = formatSize(info.Size())
-			followOffset = info.Size()
+		if multiFile {
+			filename = fmt.Sprintf("%d files", len(fileArgs))
+			// Sort by timestamp for merged timeline
+			sort.SliceStable(records, func(i, j int) bool {
+				if records[i].Timestamp.IsZero() || records[j].Timestamp.IsZero() {
+					return false // keep original order for records without timestamps
+				}
+				return records[i].Timestamp.Before(records[j].Timestamp)
+			})
+			// Compute total size
+			var totalSize int64
+			for _, path := range fileArgs {
+				if info, e := os.Stat(path); e == nil {
+					totalSize += info.Size()
+				}
+			}
+			fileSize = formatSize(totalSize)
+		} else {
+			filename = fileArgs[0]
+			if info, e := os.Stat(fileArgs[0]); e == nil {
+				fileSize = formatSize(info.Size())
+				followOffset = info.Size()
+			}
 		}
 	} else if input.IsStdinPipe() {
-		reader = input.NewStdinReader()
+		recs, err := readStdin()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading stdin: %v\n", err)
+			os.Exit(1)
+		}
+		records = recs
 		filename = "stdin"
-		follow = false // can't follow stdin
+		follow = false
 	} else {
 		printUsage()
 		os.Exit(1)
 	}
 
-	// Read all lines
-	lines, err := reader.ReadAll()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(lines) == 0 {
+	if len(records) == 0 {
 		fmt.Fprintln(os.Stderr, "No log lines found in input.")
 		os.Exit(1)
-	}
-
-	// Group multi-line entries, then parse
-	entries := input.GroupLines(lines)
-	records := make([]parser.Record, 0, len(entries))
-	for _, entry := range entries {
-		records = append(records, parser.Parse(entry.Text, entry.LineNumber))
 	}
 
 	// Build index
@@ -125,9 +138,15 @@ func main() {
 		return
 	}
 
+	// Follow mode only works with a single file
+	if follow && multiFile {
+		fmt.Fprintln(os.Stderr, "Warning: follow mode (-f) only works with a single file, ignoring -f")
+		follow = false
+	}
+
 	// Start TUI
 	model := ui.NewModel(idx, filename, fileSize)
-	if follow && len(fileArgs) > 0 {
+	if follow && len(fileArgs) == 1 {
 		fr := input.NewFollowReader(fileArgs[0], followOffset)
 		model.SetFollowReader(fr)
 	}
@@ -137,6 +156,48 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// readFile reads and parses a single file. If multiFile is true, adds source field.
+func readFile(path string, multiFile bool) ([]parser.Record, error) {
+	reader, err := input.NewFileReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	lines, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	entries := input.GroupLines(lines)
+	records := make([]parser.Record, 0, len(entries))
+	source := filepath.Base(path)
+	for _, entry := range entries {
+		r := parser.Parse(entry.Text, entry.LineNumber)
+		if multiFile {
+			r.Fields["source"] = source
+		}
+		records = append(records, r)
+	}
+	return records, nil
+}
+
+// readStdin reads and parses from stdin.
+func readStdin() ([]parser.Record, error) {
+	reader := input.NewStdinReader()
+	lines, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	entries := input.GroupLines(lines)
+	records := make([]parser.Record, 0, len(entries))
+	for _, entry := range entries {
+		records = append(records, parser.Parse(entry.Text, entry.LineNumber))
+	}
+	return records, nil
 }
 
 func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly bool) {
@@ -216,11 +277,12 @@ func printUsage() {
 	fmt.Printf(`logq %s — Fast, interactive log explorer for the terminal
 
 Usage:
-  logq <file>          Open a log file
-  logq <file.gz>       Open a gzipped log file
-  logq -f <file>       Follow a growing file (like tail -f)
-  <cmd> | logq         Read from stdin pipe
-  logq update          Update to the latest version
+  logq <file>              Open a log file
+  logq <file1> <file2>     Open multiple files (merged by timestamp)
+  logq <file.gz>           Open a gzipped log file
+  logq -f <file>           Follow a growing file (like tail -f)
+  <cmd> | logq             Read from stdin pipe
+  logq update              Update to the latest version
 
 Options:
   -f                   Follow mode — watch for new lines appended to the file
@@ -233,7 +295,7 @@ Options:
 
 Keyboard:
   /          Focus filter bar
-  j/k, ↑/↓  Scroll logs
+  j/k, Up/Dn Scroll logs
   Enter      Show record detail
   s          Save filtered results to file
   Tab        Toggle histogram focus
@@ -246,6 +308,8 @@ Query examples:
   message~"timeout.*"             Regex match
   level:error AND service:auth    Compound query
   NOT service:healthcheck         Negation
+  last:5m                         Last 5 minutes
+  source:app.log AND level:error  Filter by source file (multi-file)
 `, version)
 }
 

@@ -148,6 +148,13 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 		usedWidth += 5 + 2
 	}
 
+	// Source file indicator (multi-file mode)
+	if src, ok := r.Fields["source"]; ok {
+		srcStr := "<" + src + ">"
+		parts = append(parts, lipgloss.NewStyle().Foreground(colorCyan).Render(srcStr))
+		usedWidth += len(srcStr) + 2
+	}
+
 	// Service
 	if svc, ok := r.Fields["service"]; ok {
 		svcStr := "[" + svc + "]"
@@ -160,7 +167,7 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 		"timestamp": true, "ts": true, "time": true, "@timestamp": true,
 		"level": true, "lvl": true, "severity": true,
 		"message": true, "msg": true, "body": true,
-		"service": true, "datetime": true, "t": true, "loglevel": true, "text": true,
+		"service": true, "source": true, "datetime": true, "t": true, "loglevel": true, "text": true,
 	}
 
 	var extraStr string

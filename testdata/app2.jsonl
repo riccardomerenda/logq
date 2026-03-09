@@ -1,0 +1,3 @@
+{"timestamp":"2026-03-08T10:00:02Z","level":"info","service":"api","message":"request ok","latency":45}
+{"timestamp":"2026-03-08T10:00:04Z","level":"warn","service":"db","message":"slow query","latency":1523}
+{"timestamp":"2026-03-08T10:00:06Z","level":"error","service":"api","message":"connection refused","retries":3}
