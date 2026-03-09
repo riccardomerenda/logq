@@ -88,8 +88,12 @@ func FormatRecord(r Record) string {
 		b.WriteString("]  ")
 	}
 
-	// Message
-	b.WriteString(r.Message)
+	// Message (first line only for list view)
+	msg := r.Message
+	if idx := strings.IndexByte(msg, '\n'); idx >= 0 {
+		msg = msg[:idx]
+	}
+	b.WriteString(msg)
 
 	// Remaining fields sorted
 	skip := map[string]bool{}

@@ -132,26 +132,27 @@ func (lv *LogView) View() string {
 
 func formatLogLine(r parser.Record, maxWidth int) string {
 	var parts []string
+	usedWidth := 0
 
 	// Timestamp
 	if !r.Timestamp.IsZero() {
-		parts = append(parts, StyleDim.Render(r.Timestamp.Format("15:04:05")))
+		ts := r.Timestamp.Format("15:04:05")
+		parts = append(parts, StyleDim.Render(ts))
+		usedWidth += len(ts) + 2 // +2 for separator
 	}
 
 	// Level badge
 	if r.Level != "" {
 		badge := fmt.Sprintf("%-5s", strings.ToUpper(r.Level))
 		parts = append(parts, LevelStyle(r.Level).Render(badge))
+		usedWidth += 5 + 2
 	}
 
 	// Service
 	if svc, ok := r.Fields["service"]; ok {
-		parts = append(parts, StyleDim.Render("["+svc+"]"))
-	}
-
-	// Message
-	if r.Message != "" {
-		parts = append(parts, lipgloss.NewStyle().Foreground(colorWhite).Render(r.Message))
+		svcStr := "[" + svc + "]"
+		parts = append(parts, StyleDim.Render(svcStr))
+		usedWidth += len(svcStr) + 2
 	}
 
 	// Extra fields
@@ -162,22 +163,36 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 		"service": true, "datetime": true, "t": true, "loglevel": true, "text": true,
 	}
 
-	var extras []string
+	var extraStr string
 	for k, v := range r.Fields {
 		if !skip[k] {
-			extras = append(extras, StyleDim.Render(k+"="+v))
+			extraStr += "  " + k + "=" + v
 		}
 	}
 
-	line := strings.Join(parts, "  ")
-	if len(extras) > 0 {
-		line += "  " + strings.Join(extras, " ")
+	// Message — first line only, truncated to remaining width
+	if r.Message != "" {
+		msg := r.Message
+		// Strip to first line only
+		if idx := strings.IndexByte(msg, '\n'); idx >= 0 {
+			msg = msg[:idx]
+		}
+		// Reserve space for extras, then truncate message to fit
+		remaining := maxWidth - usedWidth - len(extraStr) - 1
+		if remaining < 20 {
+			// Not enough room for extras, drop them and give full width to message
+			remaining = maxWidth - usedWidth - 1
+			extraStr = ""
+		}
+		if remaining > 0 && len(msg) > remaining {
+			msg = msg[:remaining-1] + "…"
+		}
+		parts = append(parts, lipgloss.NewStyle().Foreground(colorWhite).Render(msg))
 	}
 
-	// Truncate if needed
-	if maxWidth > 0 && lipgloss.Width(line) > maxWidth {
-		// Simple truncation — not perfect with ANSI but good enough
-		line = line[:min(len(line), maxWidth*2)] // rough estimate accounting for ANSI
+	line := strings.Join(parts, "  ")
+	if extraStr != "" {
+		line += StyleDim.Render(extraStr)
 	}
 
 	return line
@@ -185,13 +200,6 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 
 func max(a, b int) int {
 	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
 		return a
 	}
 	return b

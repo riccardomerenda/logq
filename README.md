@@ -39,6 +39,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Instant filtering** &#8212; type a query, results update as you type
 - **Time histogram** &#8212; see log volume and error spikes at a glance
 - **Record detail** &#8212; press Enter to inspect any log line fully
+- **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text
 - **Single binary** &#8212; no dependencies, no config files, just run it
 
@@ -112,9 +113,28 @@ logq auto-detects the format of **each line** independently:
 | **logfmt** | `level=error msg="timeout" latency=523` |
 | **Plain text** | `ERROR: connection timeout after 523ms` |
 
-Timestamps are auto-parsed from RFC3339, ISO 8601, Unix epoch, syslog, nginx/Apache formats, and more. Log levels are normalized from dozens of variants (`WARNING`, `WARN`, `WRN`, `W` all become `warn`).
+Timestamps are auto-parsed from RFC3339, ISO 8601, Unix epoch, syslog, nginx/Apache formats, time-only (`HH:MM:SS`), and more. Log levels are normalized from dozens of variants (`WARNING`, `WARN`, `WRN`, `W` all become `warn`).
 
 Mixed formats in the same file are handled gracefully.
+
+### Multi-Line Log Entries
+
+logq automatically groups multi-line log entries like stack traces, exception dumps, and multi-line error messages into single records. The grouping strategy is auto-detected:
+
+- **Timestamp-anchored** &#8212; entries start with a timestamp; continuation lines (indented stack traces, JSON payloads, etc.) are grouped with the preceding entry
+- **Structured** &#8212; entries start with `{` (JSON) or `key=value` (logfmt); everything else is a continuation
+- **Single-line** &#8212; for files where every line is its own entry (standard JSON Lines, logfmt), no grouping overhead is added
+
+This works out of the box for .NET exceptions, Java stack traces, Python tracebacks, and any log format where entries start with a timestamp.
+
+**Example:** a 1300-line .NET exception log with embedded Elasticsearch JSON errors is automatically grouped into 15 logical entries, each with its full stack trace accessible via the detail view (Enter).
+
+### Plain Text Timestamp & Level Detection
+
+For unstructured plain text logs, logq extracts:
+
+- **Timestamps** from the start of lines: `12:43:10 ...`, `2026-03-08 10:00:01 ...`, `Mar  8 10:00:01 ...`, etc.
+- **Log levels** from keywords near the start: `ERROR`, `WARN`, `INFO`, `DEBUG`, `FATAL`, `CRITICAL`, `PANIC`
 
 ## Architecture
 
@@ -122,22 +142,22 @@ Mixed formats in the same file are handled gracefully.
   File / stdin / .gz
         │
         ▼
-   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌───────────┐
-   │  Input   │───▶│ Parser  │───▶│  Index  │───▶│  Query    │
-   │  Reader  │    │ JSON    │    │ Inverted│    │  Engine   │
-   │          │    │ logfmt  │    │ Numeric │    │  Lexer    │
-   │  gzip    │    │ plain   │    │ Time    │    │  Parser   │
-   └─────────┘    └─────────┘    └─────────┘    │  Evaluator│
-                                                 └─────┬─────┘
-                                                       │
-                                                       ▼
-                                                 ┌───────────┐
-                                                 │  TUI      │
-                                                 │  Log View │
-                                                 │  Histogram│
-                                                 │  Query Bar│
-                                                 │  Detail   │
-                                                 └───────────┘
+   ┌─────────┐    ┌──────────┐    ┌─────────┐    ┌─────────┐    ┌───────────┐
+   │  Input   │───▶│ Multiline│───▶│ Parser  │───▶│  Index  │───▶│  Query    │
+   │  Reader  │    │ Grouper  │    │ JSON    │    │ Inverted│    │  Engine   │
+   │          │    │          │    │ logfmt  │    │ Numeric │    │  Lexer    │
+   │  gzip    │    │ auto-    │    │ plain   │    │ Time    │    │  Parser   │
+   └─────────┘    │ detect   │    └─────────┘    └─────────┘    │  Evaluator│
+                  └──────────┘                                   └─────┬─────┘
+                                                                       │
+                                                                       ▼
+                                                                 ┌───────────┐
+                                                                 │  TUI      │
+                                                                 │  Log View │
+                                                                 │  Histogram│
+                                                                 │  Query Bar│
+                                                                 │  Detail   │
+                                                                 └───────────┘
 ```
 
 **Performance by design:**
@@ -162,9 +182,15 @@ make build
 ### Development
 
 ```bash
-make test     # run all 53 tests
+make test     # run all tests
 make lint     # run linter (requires golangci-lint)
 make run      # build and run with sample data
+```
+
+### Benchmarks
+
+```bash
+go test ./benchmarks/ -bench=. -benchmem
 ```
 
 ### Project Structure
@@ -173,11 +199,14 @@ make run      # build and run with sample data
 logq/
 ├── main.go                     # CLI entry point
 ├── internal/
-│   ├── input/reader.go         # File, stdin, gzip reading
+│   ├── input/
+│   │   ├── reader.go           # File, stdin, gzip reading
+│   │   └── multiline.go        # Multi-line entry grouping
 │   ├── parser/                 # JSON, logfmt, plain text, timestamps
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
 │   └── ui/                     # Bubbletea TUI components
+├── benchmarks/                 # Performance benchmarks
 └── testdata/                   # Sample log files for testing
 ```
 

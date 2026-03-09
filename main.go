@@ -62,13 +62,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse records
-	records := make([]parser.Record, 0, len(lines))
-	for i, line := range lines {
-		if line == "" {
-			continue
-		}
-		records = append(records, parser.Parse(line, i+1))
+	// Group multi-line entries, then parse
+	entries := input.GroupLines(lines)
+	records := make([]parser.Record, 0, len(entries))
+	for _, entry := range entries {
+		records = append(records, parser.Parse(entry.Text, entry.LineNumber))
 	}
 
 	// Build index

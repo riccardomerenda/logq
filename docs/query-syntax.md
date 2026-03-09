@@ -106,6 +106,8 @@ An empty filter bar matches all records &#8212; press `Escape` to clear.
 
 ## Examples
 
+### Structured logs (JSON / logfmt)
+
 ```
 # Find all errors in the auth service
 level:error AND service:auth
@@ -124,4 +126,25 @@ message~"timeout" AND latency>500
 
 # Find critical issues across payment services
 (level:error OR level:fatal) AND service~"payment.*"
+```
+
+### Plain text / multi-line logs
+
+For unstructured logs (stack traces, application output, etc.), full-text search is the most useful:
+
+```
+# Find entries containing an exception type
+NullPointerException
+
+# Search for a specific error message in .NET stack traces
+too_many_clauses
+
+# Find entries mentioning a PID
+73902
+
+# Combine full-text with level detection
+level:error AND connection refused
+
+# Find entries mentioning specific classes
+DocumentManager
 ```
