@@ -8,7 +8,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
+	"github.com/riccardomerenda/logq/internal/output"
 	"github.com/riccardomerenda/logq/internal/parser"
+	"github.com/riccardomerenda/logq/internal/query"
 	"github.com/riccardomerenda/logq/internal/ui"
 )
 
@@ -28,13 +30,42 @@ func main() {
 	// Parse arguments
 	args := os.Args[1:]
 	follow := false
+	queryStr := ""
+	outputPath := ""
+	outputFmt := ""
+	countOnly := false
+
 	if len(args) > 0 && args[0] == "update" {
 		selfUpdate()
 		os.Exit(0)
 	}
-	if len(args) > 0 && args[0] == "-f" {
-		follow = true
-		args = args[1:]
+
+	// Parse flags
+	var fileArgs []string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-f":
+			follow = true
+		case "-q":
+			if i+1 < len(args) {
+				i++
+				queryStr = args[i]
+			}
+		case "-o":
+			if i+1 < len(args) {
+				i++
+				outputPath = args[i]
+			}
+		case "--format":
+			if i+1 < len(args) {
+				i++
+				outputFmt = args[i]
+			}
+		case "--count":
+			countOnly = true
+		default:
+			fileArgs = append(fileArgs, args[i])
+		}
 	}
 
 	var reader *input.Reader
@@ -43,8 +74,8 @@ func main() {
 	var followOffset int64
 	var err error
 
-	if len(args) > 0 {
-		path := args[0]
+	if len(fileArgs) > 0 {
+		path := fileArgs[0]
 		reader, err = input.NewFileReader(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
@@ -88,10 +119,16 @@ func main() {
 	// Build index
 	idx := index.Build(records)
 
+	// Batch mode: -q flag provided, skip TUI
+	if queryStr != "" || countOnly {
+		runBatch(idx, queryStr, outputPath, outputFmt, countOnly)
+		return
+	}
+
 	// Start TUI
 	model := ui.NewModel(idx, filename, fileSize)
-	if follow && len(args) > 0 {
-		fr := input.NewFollowReader(args[0], followOffset)
+	if follow && len(fileArgs) > 0 {
+		fr := input.NewFollowReader(fileArgs[0], followOffset)
 		model.SetFollowReader(fr)
 	}
 	p := tea.NewProgram(model, tea.WithAltScreen())
@@ -99,6 +136,56 @@ func main() {
 	if err := p.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly bool) {
+	// Parse and evaluate query
+	var results []int
+	if queryStr == "" {
+		results = idx.AllIDs()
+	} else {
+		node, err := query.ParseQuery(queryStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Query error: %v\n", err)
+			os.Exit(1)
+		}
+		results = query.Evaluate(node, idx)
+	}
+
+	// Count-only mode
+	if countOnly {
+		fmt.Println(len(results))
+		return
+	}
+
+	// Determine output format
+	format, err := output.ParseFormat(outputFmt)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	// Determine output writer
+	var w *os.File
+	if outputPath != "" {
+		w, err = os.Create(outputPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output file: %v\n", err)
+			os.Exit(1)
+		}
+		defer w.Close()
+	} else {
+		w = os.Stdout
+	}
+
+	if err := output.Write(w, idx.Records, results, format); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+		os.Exit(1)
+	}
+
+	if outputPath != "" {
+		fmt.Fprintf(os.Stderr, "%d records written to %s\n", len(results), outputPath)
 	}
 }
 
@@ -137,6 +224,10 @@ Usage:
 
 Options:
   -f                   Follow mode — watch for new lines appended to the file
+  -q <query>           Run query in batch mode (no TUI), output to stdout
+  -o <file>            Write results to file (use with -q)
+  --format <fmt>       Output format: raw (default), json, csv
+  --count              Print match count only (use with -q)
   -h, --help           Show this help
   -v, --version        Show version
 
@@ -144,6 +235,7 @@ Keyboard:
   /          Focus filter bar
   j/k, ↑/↓  Scroll logs
   Enter      Show record detail
+  s          Save filtered results to file
   Tab        Toggle histogram focus
   Esc        Clear filter / close detail
   q          Quit

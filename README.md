@@ -47,6 +47,8 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
 - **Record detail** &#8212; press Enter to inspect any log line, `c` to copy to clipboard
+- **Export & batch mode** &#8212; `logq -q "level:error" -o errors.jsonl` for scripting, or press `s` to save from the TUI
+- **Query history** &#8212; Up/Down arrows in the filter bar to recall previous queries
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text
 - **Single binary** &#8212; no dependencies, no config files, just run it
@@ -88,6 +90,27 @@ docker logs mycontainer 2>&1 | logq
 logq server.log.gz
 ```
 
+## Batch Mode & Export
+
+Run queries without the TUI for scripting and pipelines:
+
+```bash
+# Filter and print to stdout
+logq server.log -q "level:error"
+
+# Save to file
+logq server.log -q "level:error AND service:auth" -o errors.jsonl
+
+# Output as JSON (re-serialized fields) or CSV
+logq server.log -q "latency>1000" --format json
+logq server.log -q "latency>1000" --format csv
+
+# Count matches only
+logq server.log -q "level:error" --count
+```
+
+In the TUI, press `s` to save the current filtered results to a file.
+
 ## Query Syntax
 
 Type queries in the filter bar (`/`). Results update live.
@@ -117,10 +140,12 @@ See the [full query reference](docs/query-syntax.md) for details.
 |---|---|
 | `/` | Focus the filter bar |
 | `j` / `k` or `Up` / `Down` | Scroll through logs |
+| `Up` / `Down` (in filter bar) | Browse query history |
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to start / end |
 | `Enter` | Show full record detail |
 | `c` | Copy raw record to clipboard (in detail view) |
+| `s` | Save filtered results to file |
 | `Escape` | Clear filter / close detail overlay |
 | `Tab` | Toggle focus between log view and histogram |
 | `q` | Quit |
@@ -172,14 +197,15 @@ For unstructured plain text logs, logq extracts:
    └─────────┘    │ detect   │    └─────────┘    └─────────┘    │  Evaluator│
                   └──────────┘                                   └─────┬─────┘
                                                                        │
-                                                                       ▼
-                                                                 ┌───────────┐
-                                                                 │  TUI      │
-                                                                 │  Log View │
-                                                                 │  Histogram│
-                                                                 │  Query Bar│
-                                                                 │  Detail   │
-                                                                 └───────────┘
+                                                              ┌────────┴────────┐
+                                                              ▼                 ▼
+                                                        ┌───────────┐    ┌───────────┐
+                                                        │  TUI      │    │  Batch    │
+                                                        │  Log View │    │  Export   │
+                                                        │  Histogram│    │  raw/json │
+                                                        │  Query Bar│    │  csv      │
+                                                        │  Detail   │    │  stdout   │
+                                                        └───────────┘    └───────────┘
 ```
 
 **Performance by design:**
@@ -228,6 +254,7 @@ logq/
 │   ├── parser/                 # JSON, logfmt, plain text, timestamps
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
+│   ├── output/                 # Export writers (raw, JSON, CSV)
 │   └── ui/                     # Bubbletea TUI components
 ├── benchmarks/                 # Performance benchmarks
 └── testdata/                   # Sample log files for testing

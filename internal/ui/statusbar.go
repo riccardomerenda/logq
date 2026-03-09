@@ -13,6 +13,7 @@ type StatusBar struct {
 	filename   string
 	fileSize   string
 	following  bool
+	flashMsg   string // temporary message (cleared after one render)
 	width      int
 }
 
@@ -37,6 +38,12 @@ func (sb *StatusBar) Update(matches, total int, qt time.Duration, filename, file
 
 // View renders the status bar.
 func (sb *StatusBar) View() string {
+	if sb.flashMsg != "" {
+		msg := sb.flashMsg
+		sb.flashMsg = ""
+		return StyleStatusBar.Width(sb.width).Render(" " + msg)
+	}
+
 	left := fmt.Sprintf(" %d matches / %d total", sb.matchCount, sb.totalCount)
 	middle := ""
 	if sb.queryTime > 0 {
@@ -53,7 +60,7 @@ func (sb *StatusBar) View() string {
 	if sb.following {
 		follow = "  [following]"
 	}
-	help := "  / filter  q quit"
+	help := "  / filter  s save  q quit"
 
 	content := left + middle + right + follow + help
 	return StyleStatusBar.Width(sb.width).Render(content)

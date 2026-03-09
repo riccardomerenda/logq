@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
+	"github.com/riccardomerenda/logq/internal/output"
 	"github.com/riccardomerenda/logq/internal/parser"
 	"github.com/riccardomerenda/logq/internal/query"
 )
@@ -168,9 +171,26 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focus = FocusLogView
 			return m, nil
 		case key.Matches(msg, m.keys.Enter):
+			m.queryBar.PushHistory(m.queryBar.Value())
 			m.executeQuery()
 			m.queryBar.Blur()
 			m.focus = FocusLogView
+			return m, nil
+		case key.Matches(msg, m.keys.Up):
+			if m.queryBar.HistoryUp() {
+				if m.queryBar.Value() != m.queryStr {
+					m.executeQuery()
+				}
+				return m, nil
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.Down):
+			if m.queryBar.HistoryDown() {
+				if m.queryBar.Value() != m.queryStr {
+					m.executeQuery()
+				}
+				return m, nil
+			}
 			return m, nil
 		default:
 			ti := m.queryBar.TextInput()
@@ -261,6 +281,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.queryBar.SetValue("")
 		m.executeQuery()
 		return m, nil
+	case key.Matches(msg, m.keys.Save):
+		path := m.saveResults()
+		if path != "" {
+			m.statusBar.flashMsg = fmt.Sprintf("Saved %d records to %s", len(m.results), path)
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -350,6 +376,22 @@ func (m Model) handleFollowTick() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		return newRecordsMsg{records: records}
 	}
+}
+
+func (m *Model) saveResults() string {
+	if len(m.results) == 0 {
+		return ""
+	}
+	filename := fmt.Sprintf("logq-export-%s.jsonl", time.Now().Format("20060102-150405"))
+	f, err := os.Create(filename)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	if err := output.Write(f, m.index.Records, m.results, output.FormatRaw); err != nil {
+		return ""
+	}
+	return filename
 }
 
 func copyToClipboard(text string) error {

@@ -1,6 +1,6 @@
 # logq Query Syntax Reference
 
-logq uses a simple, powerful query language for filtering logs. Type queries in the filter bar (`/`) and results update live as you type.
+logq uses a simple, powerful query language for filtering logs. Type queries in the filter bar (`/`) and results update live as you type. Queries also work in batch mode with the `-q` flag (see [Batch Mode](#batch-mode) below).
 
 ## Full-Text Search
 
@@ -148,3 +148,43 @@ level:error AND connection refused
 # Find entries mentioning specific classes
 DocumentManager
 ```
+
+## Batch Mode
+
+All query syntax works in batch (non-interactive) mode using the `-q` flag:
+
+```bash
+# Print matching lines to stdout
+logq server.log -q "level:error AND service:auth"
+
+# Save to a file
+logq server.log -q "level:error" -o errors.jsonl
+
+# Output as JSON (re-serialized from parsed fields)
+logq server.log -q "latency>1000" --format json
+
+# Output as CSV (with header row)
+logq server.log -q "latency>1000" --format csv
+
+# Count matches only
+logq server.log -q "level:error" --count
+```
+
+Batch mode skips the TUI and writes directly to stdout (or a file with `-o`). This is useful for scripting, pipelines, and automated log processing.
+
+### Output formats
+
+| Format | Description |
+|---|---|
+| `raw` (default) | Original log lines as-is |
+| `json` | One JSON object per line (re-serialized from parsed fields) |
+| `csv` | Header row + values, with all fields across matched records |
+
+## Query History
+
+In the TUI, the filter bar (`/`) supports query history:
+
+- **Up arrow** &#8212; recall the previous query
+- **Down arrow** &#8212; go to the next query, or back to what you were typing
+- History is kept for the current session (up to 100 entries)
+- Consecutive duplicate queries are deduplicated

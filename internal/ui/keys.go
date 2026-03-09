@@ -16,6 +16,7 @@ type KeyMap struct {
 	Tab      key.Binding
 	Quit     key.Binding
 	Copy     key.Binding
+	Save     key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings.
@@ -68,6 +69,10 @@ func DefaultKeyMap() KeyMap {
 		Copy: key.NewBinding(
 			key.WithKeys("c"),
 			key.WithHelp("c", "copy raw"),
+		),
+		Save: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "save results"),
 		),
 	}
 }
