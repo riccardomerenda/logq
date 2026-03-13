@@ -215,10 +215,3 @@ func formatLogLine(r parser.Record, maxWidth int, highlights []HighlightTerm) st
 
 	return line
 }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

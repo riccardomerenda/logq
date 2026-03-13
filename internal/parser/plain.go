@@ -3,6 +3,7 @@ package parser
 import (
 	"regexp"
 	"strings"
+	"time"
 )
 
 // plainTimestampPatterns attempt to extract a timestamp from the start of a
@@ -59,8 +60,8 @@ func parsePlain(line string, lineNumber int) Record {
 	trimmed := strings.TrimSpace(firstLine)
 	for _, p := range plainTimestampPatterns {
 		if m := p.re.FindString(trimmed); m != "" {
-			for _, fmt := range p.formats {
-				if t, err := parseTimeSafe(fmt, m); err == nil {
+			for _, layout := range p.formats {
+				if t, err := time.Parse(layout, m); err == nil {
 					r.Timestamp = t
 					r.Fields["timestamp"] = m
 					break

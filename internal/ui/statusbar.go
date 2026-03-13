@@ -39,9 +39,7 @@ func (sb *StatusBar) Update(matches, total int, qt time.Duration, filename, file
 // View renders the status bar.
 func (sb *StatusBar) View() string {
 	if sb.flashMsg != "" {
-		msg := sb.flashMsg
-		sb.flashMsg = ""
-		return StyleStatusBar.Width(sb.width).Render(" " + msg)
+		return StyleStatusBar.Width(sb.width).Render(" " + sb.flashMsg)
 	}
 
 	left := fmt.Sprintf(" %d matches / %d total", sb.matchCount, sb.totalCount)

@@ -22,17 +22,6 @@ var timestampStartPattern = regexp.MustCompile(
 // (JSON or logfmt), which should always be treated as new entries.
 var structuredLinePattern = regexp.MustCompile(`^[{\[]|^\w+=`)
 
-// continuationPattern matches lines that are clearly continuations:
-// indented lines, stack trace markers, or closing braces.
-var continuationPattern = regexp.MustCompile(
-	`^(?:` +
-		`\s+` + // indented (stack traces, wrapped text)
-		`|Caused by:` + // Java chained exceptions
-		`|\.{3}\s+\d+\s+more` + // Java "... N more"
-		`|\}` + // closing brace (JSON block end)
-		`|\]` + // closing bracket
-		`)`,
-)
 
 // GroupLines merges raw lines into logical multi-line log entries.
 // A new entry starts when a line begins with a recognized timestamp pattern

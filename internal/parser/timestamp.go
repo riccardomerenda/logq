@@ -50,8 +50,3 @@ func ParseTimestamp(s string) (time.Time, error) {
 
 	return time.Time{}, &time.ParseError{Value: s, Message: "unrecognized timestamp format"}
 }
-
-// parseTimeSafe is a wrapper around time.Parse that never panics.
-func parseTimeSafe(layout, value string) (time.Time, error) {
-	return time.Parse(layout, value)
-}

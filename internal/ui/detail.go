@@ -95,7 +95,6 @@ func (d *DetailView) View() string {
 	hint := "  Press Escape to close, c to copy raw"
 	if d.copyMsg != "" {
 		hint = "  " + d.copyMsg
-		d.copyMsg = ""
 	}
 	b.WriteString(StyleDim.Render(hint))
 

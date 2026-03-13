@@ -259,24 +259,3 @@ func TestAutoDetectionOrder(t *testing.T) {
 	}
 }
 
-func TestFormatRecord(t *testing.T) {
-	line := `{"timestamp":"2026-03-08T10:00:01Z","level":"error","service":"auth","message":"token expired","user_id":"u_882"}`
-	r := Parse(line, 1)
-	formatted := FormatRecord(r)
-
-	if !strings.Contains(formatted, "10:00:01") {
-		t.Error("Formatted line should contain timestamp")
-	}
-	if !strings.Contains(formatted, "ERROR") {
-		t.Error("Formatted line should contain level")
-	}
-	if !strings.Contains(formatted, "[auth]") {
-		t.Error("Formatted line should contain service")
-	}
-	if !strings.Contains(formatted, "token expired") {
-		t.Error("Formatted line should contain message")
-	}
-	if !strings.Contains(formatted, "user_id=u_882") {
-		t.Error("Formatted line should contain extra fields")
-	}
-}

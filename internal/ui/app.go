@@ -26,6 +26,12 @@ type newRecordsMsg struct {
 	records []parser.Record
 }
 
+// clearFlashMsg signals that the status bar flash message should be cleared.
+type clearFlashMsg struct{}
+
+// clearCopyMsg signals that the detail view copy message should be cleared.
+type clearCopyMsg struct{}
+
 // Focus tracks which panel has focus.
 type Focus int
 
@@ -126,6 +132,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.index.AddRecords(msg.records)
 		m.executeQuery()
 		return m, m.followTick()
+
+	case clearFlashMsg:
+		m.statusBar.flashMsg = ""
+		return m, nil
+
+	case clearCopyMsg:
+		m.detail.copyMsg = ""
+		return m, nil
 	}
 
 	// Pass through to query bar if focused
@@ -158,6 +172,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				} else {
 					m.detail.copyMsg = "Copy failed"
 				}
+				return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearCopyMsg{} })
 			}
 		}
 		return m, nil
@@ -298,6 +313,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		path := m.saveResults()
 		if path != "" {
 			m.statusBar.flashMsg = fmt.Sprintf("Saved %d records to %s", len(m.results), path)
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearFlashMsg{} })
 		}
 		return m, nil
 	}
@@ -447,9 +463,6 @@ func (m Model) View() string {
 	// Main layout: log view (left) | histogram (right)
 	logContent := m.logView.View()
 	histContent := m.histogram.View()
-
-	separator := lipgloss.NewStyle().Foreground(colorGray).Render("│")
-	_ = separator
 
 	mainPanel := lipgloss.JoinHorizontal(
 		lipgloss.Top,
