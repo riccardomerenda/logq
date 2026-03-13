@@ -245,6 +245,17 @@ Batch mode skips the TUI and writes directly to stdout (or a file with `-o`). Th
 | `json` | One JSON object per line (re-serialized from parsed fields) |
 | `csv` | Header row + values, with all fields across matched records |
 
+## Field Auto-Complete
+
+The filter bar supports inline auto-completion for field names and values:
+
+- **Ghost text** &#8212; as you type, a dimmed suggestion appears after the cursor previewing the completion
+- **Tab** &#8212; press Tab to accept the suggestion
+- **Field names** &#8212; type a few characters of a field name (e.g., `lev`) and Tab to complete to `level:`; a colon is appended automatically
+- **Field values** &#8212; after typing `field:` (e.g., `level:`), suggestions show known values for that field; type a prefix to narrow down
+- **Keywords** &#8212; `AND`, `OR`, `NOT`, and `last` are also completable
+- **Low-cardinality only** &#8212; value suggestions are shown only for fields with 50 or fewer unique values (e.g., `level`, `service`, `method`), not for high-cardinality fields like `request_id`
+
 ## Query History
 
 In the TUI, the filter bar (`/`) supports query history:

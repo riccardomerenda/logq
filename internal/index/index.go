@@ -120,6 +120,33 @@ func (idx *Index) AddRecords(records []parser.Record) {
 	idx.TotalCount = len(idx.Records)
 }
 
+// FieldNames returns all indexed field names, sorted alphabetically.
+func (idx *Index) FieldNames() []string {
+	names := make([]string, 0, len(idx.fieldIndex))
+	for k := range idx.fieldIndex {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// FieldValues returns unique values for a field, sorted alphabetically.
+// Returns nil if the field has more than maxCompletionCardinality unique values.
+const maxCompletionCardinality = 50
+
+func (idx *Index) FieldValues(field string) []string {
+	vals, ok := idx.fieldIndex[field]
+	if !ok || len(vals) > maxCompletionCardinality {
+		return nil
+	}
+	result := make([]string, 0, len(vals))
+	for v := range vals {
+		result = append(result, v)
+	}
+	sort.Strings(result)
+	return result
+}
+
 // FieldLookup returns record IDs where field has the given value.
 func (idx *Index) FieldLookup(field, value string) []int {
 	if vals, ok := idx.fieldIndex[field]; ok {

@@ -29,6 +29,7 @@ All original 6 phases are shipped. logq is a working, interactive terminal log e
 | Query history (Up/Down in filter bar, draft preservation) | Done (v0.4.0) |
 | Multiple file support (merged timeline, `source:filename`) | Done (v0.5.0) |
 | Match highlighting (search terms highlighted in log view + detail) | Done (v0.6.0) |
+| Field auto-complete (Tab completion for field names + value suggestions) | Done (v0.6.0) |
 
 ---
 
@@ -224,42 +225,40 @@ Save query history to `~/.local/share/logq/history` (XDG-compliant). Load on sta
 ### Phase 11: Field Auto-Complete
 **Priority:** Medium — Helps discoverability on unfamiliar logs
 **Effort:** Medium
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 #### 11.1 — Tab completion for field names
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-When the cursor is at a word boundary in the query bar, pressing Tab shows/cycles through matching field names from the index.
+When the cursor is at a word boundary in the query bar, pressing Tab accepts the inline ghost-text suggestion. Field names are completed with `:` appended automatically. Keywords (`AND`, `OR`, `NOT`, `last`) are also completable.
 
-**Files to modify:**
-- `internal/ui/querybar.go` — extract current word prefix, match against index field names, cycle through completions on Tab
-- `internal/ui/app.go` — pass field names from index to querybar on init and when index updates (follow mode)
+**Files created:**
+- `internal/ui/completer.go` — `Completer` struct, `extractCompletionContext()` to parse cursor context, `computeCandidates()` to match against index
+
+**Files modified:**
+- `internal/index/index.go` — added `FieldNames()` and `FieldValues(field)` methods
+- `internal/ui/querybar.go` — added `UpdateCompletions()`, `AcceptCompletion()`, ghost text rendering in `View()`
+- `internal/ui/app.go` — Tab handling in query bar focus, `UpdateCompletions()` called after text changes
 
 #### 11.2 — Completion popup (stretch)
-**Status:** [ ] Not started
-
-Show a small dropdown of matching field names below the query bar.
-
-**Files to modify:**
-- `internal/ui/querybar.go` — render suggestion list overlay
-- `internal/ui/app.go` — layout the overlay above the status bar
+**Status:** [ ] Not started (deferred — inline ghost text is sufficient for now)
 
 #### 11.3 — Value suggestions for known fields
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-For fields with low cardinality (e.g., `level`, `service`), suggest values after typing `field:`.
+For fields with low cardinality (50 or fewer unique values), typing `field:` shows value suggestions. High-cardinality fields (e.g., `request_id`) are excluded.
 
-**Files to modify:**
-- `internal/index/index.go` — add `FieldValues(field string) []string` method (return unique values, cap at 20)
-- `internal/ui/querybar.go` — detect `field:` pattern, show value completions
+**Files modified:**
+- `internal/index/index.go` — `FieldValues(field)` returns nil for high-cardinality fields (>50 values)
 
 #### 11.4 — Tests
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-- Tab on `lev` → completes to `level`
-- Tab on `level:` → shows `error`, `info`, `warn`, etc.
-- Tab with no prefix → shows all field names
-- Fields from index update when new records arrive (follow mode)
+- `extractCompletionContext`: partial field, field:value, after operators, after parens, cursor in middle, quoted strings
+- `computeCandidates`: field names, field values, keywords, empty prefix, no match
+- `Completer`: ghost suffix (field name with colon, value without), cycling, reset
+- `FieldNames`: sorted, contains expected fields
+- `FieldValues`: returns values for low-cardinality fields, nil for high-cardinality
 
 ---
 

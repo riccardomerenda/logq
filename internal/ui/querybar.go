@@ -1,11 +1,14 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/riccardomerenda/logq/internal/index"
 )
 
-// QueryBar wraps a text input for filter queries with history support.
+// QueryBar wraps a text input for filter queries with history and auto-complete.
 type QueryBar struct {
 	input      textinput.Model
 	errMsg     string
@@ -13,6 +16,9 @@ type QueryBar struct {
 	history    []string
 	historyIdx int  // -1 means "not browsing history"
 	draft      string // preserves what the user was typing before browsing history
+
+	// Auto-complete
+	completer Completer
 }
 
 // NewQueryBar creates a new query bar.
@@ -45,6 +51,7 @@ func (qb *QueryBar) Focus() {
 func (qb *QueryBar) Blur() {
 	qb.input.Blur()
 	qb.historyIdx = -1
+	qb.completer.Reset()
 }
 
 // Focused returns whether the query bar has focus.
@@ -125,9 +132,86 @@ func (qb *QueryBar) HistoryDown() bool {
 	return true
 }
 
+// UpdateCompletions recomputes completion candidates based on the current input.
+func (qb *QueryBar) UpdateCompletions(idx *index.Index) {
+	text := qb.input.Value()
+	cursorPos := qb.input.Cursor()
+
+	ctx := extractCompletionContext(text, cursorPos)
+	if ctx.mode == completeNone {
+		qb.completer.Reset()
+		return
+	}
+
+	candidates := computeCandidates(ctx, idx)
+	// Don't show completion if the only candidate is exactly what's typed
+	if len(candidates) == 1 && strings.EqualFold(candidates[0], ctx.prefix) {
+		qb.completer.Reset()
+		return
+	}
+
+	qb.completer.candidates = candidates
+	qb.completer.index = 0
+	qb.completer.prefix = ctx.prefix
+	qb.completer.mode = ctx.mode
+	qb.completer.field = ctx.field
+}
+
+// AcceptCompletion applies the current completion candidate to the input.
+// Returns true if a completion was applied.
+func (qb *QueryBar) AcceptCompletion() bool {
+	if !qb.completer.HasCandidates() {
+		return false
+	}
+
+	text := qb.input.Value()
+	cursorPos := qb.input.Cursor() // rune offset
+	ctx := extractCompletionContext(text, cursorPos)
+	if ctx.mode == completeNone {
+		qb.completer.Reset()
+		return false
+	}
+
+	candidate := qb.completer.Current()
+	suffix := ""
+	if ctx.mode == completeFieldName {
+		suffix = ":" // append colon after field name
+	}
+
+	// Work in rune space for correct cursor positioning
+	runes := []rune(text)
+	before := string(runes[:ctx.tokenStart]) // tokenStart is a rune offset
+	after := ""
+	if cursorPos < len(runes) {
+		after = string(runes[cursorPos:])
+	}
+	newText := before + candidate + suffix + after
+	newCursor := ctx.tokenStart + len([]rune(candidate)) + len([]rune(suffix))
+
+	qb.input.SetValue(newText)
+	qb.input.SetCursor(newCursor)
+	qb.completer.Reset()
+	return true
+}
+
+// CycleCompletion advances to the next completion candidate without accepting.
+func (qb *QueryBar) CycleCompletion() {
+	qb.completer.Next()
+}
+
 // View renders the query bar.
 func (qb *QueryBar) View() string {
-	bar := qb.input.View()
+	ghost := qb.completer.GhostSuffix()
+	var bar string
+	if ghost != "" {
+		// Disable width padding so ghost text appears right after cursor
+		savedWidth := qb.input.Width
+		qb.input.Width = 0
+		bar = qb.input.View() + StyleDim.Render(ghost)
+		qb.input.Width = savedWidth
+	} else {
+		bar = qb.input.View()
+	}
 	if qb.errMsg != "" {
 		bar += "\n" + StyleError.Render("  "+qb.errMsg)
 	}

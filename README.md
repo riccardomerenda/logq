@@ -45,6 +45,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 
 - **Instant filtering** &#8212; type a query, results update as you type
 - **Match highlighting** &#8212; matching text is highlighted in yellow so you can instantly see *why* each record matched
+- **Field auto-complete** &#8212; press `Tab` to complete field names and values; ghost text previews the suggestion inline
 - **Multiple files** &#8212; `logq app.log db.log` merges files into a unified timeline, with `source:filename` queries
 - **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
@@ -173,6 +174,7 @@ See the [full query reference](docs/query-syntax.md) for details.
 | `/` | Focus the filter bar |
 | `j` / `k` or `Up` / `Down` | Scroll through logs |
 | `Up` / `Down` (in filter bar) | Browse query history |
+| `Tab` (in filter bar) | Accept auto-complete suggestion |
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to start / end |
 | `Enter` | Show full record detail |

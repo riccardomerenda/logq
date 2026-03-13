@@ -176,8 +176,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.queryBar.Blur()
 			m.focus = FocusLogView
 			return m, nil
+		case key.Matches(msg, m.keys.Tab):
+			if m.queryBar.AcceptCompletion() {
+				m.queryBar.UpdateCompletions(m.index)
+				if m.queryBar.Value() != m.queryStr {
+					m.executeQuery()
+				}
+			}
+			return m, nil
 		case key.Matches(msg, m.keys.Up):
 			if m.queryBar.HistoryUp() {
+				m.queryBar.completer.Reset()
 				if m.queryBar.Value() != m.queryStr {
 					m.executeQuery()
 				}
@@ -186,6 +195,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.Down):
 			if m.queryBar.HistoryDown() {
+				m.queryBar.completer.Reset()
 				if m.queryBar.Value() != m.queryStr {
 					m.executeQuery()
 				}
@@ -201,6 +211,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.queryBar.Value() != m.queryStr {
 				m.executeQuery()
 			}
+
+			// Update completions after text change
+			m.queryBar.UpdateCompletions(m.index)
 
 			return m, cmd
 		}
