@@ -10,12 +10,13 @@ import (
 
 // LogView renders the scrollable log lines panel.
 type LogView struct {
-	records []parser.Record
-	results []int // filtered record indices
-	offset  int   // scroll offset
-	cursor  int   // selected line (relative to results)
-	width   int
-	height  int
+	records    []parser.Record
+	results    []int // filtered record indices
+	offset     int   // scroll offset
+	cursor     int   // selected line (relative to results)
+	width      int
+	height     int
+	highlights []HighlightTerm
 }
 
 // NewLogView creates a new log view.
@@ -38,6 +39,11 @@ func (lv *LogView) SetResults(records []parser.Record, results []int) {
 		lv.cursor = 0
 		lv.offset = 0
 	}
+}
+
+// SetHighlights sets the terms to highlight in log output.
+func (lv *LogView) SetHighlights(h []HighlightTerm) {
+	lv.highlights = h
 }
 
 // ScrollUp moves the cursor up.
@@ -109,7 +115,7 @@ func (lv *LogView) View() string {
 	for i := lv.offset; i < end; i++ {
 		recIdx := lv.results[i]
 		r := lv.records[recIdx]
-		line := formatLogLine(r, lv.width)
+		line := formatLogLine(r, lv.width, lv.highlights)
 
 		if i == lv.cursor {
 			line = StyleHighlight.Width(lv.width).Render(line)
@@ -130,7 +136,7 @@ func (lv *LogView) View() string {
 	return b.String()
 }
 
-func formatLogLine(r parser.Record, maxWidth int) string {
+func formatLogLine(r parser.Record, maxWidth int, highlights []HighlightTerm) string {
 	var parts []string
 	usedWidth := 0
 
@@ -150,19 +156,18 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 
 	// Source file indicator (multi-file mode)
 	if src, ok := r.Fields["source"]; ok {
-		srcStr := "<" + src + ">"
-		parts = append(parts, lipgloss.NewStyle().Foreground(colorCyan).Render(srcStr))
-		usedWidth += len(srcStr) + 2
+		srcStyle := lipgloss.NewStyle().Foreground(colorCyan)
+		parts = append(parts, srcStyle.Render("<")+highlightText(src, highlights, srcStyle, "source")+srcStyle.Render(">"))
+		usedWidth += len(src) + 2 + 2
 	}
 
 	// Service
 	if svc, ok := r.Fields["service"]; ok {
-		svcStr := "[" + svc + "]"
-		parts = append(parts, StyleDim.Render(svcStr))
-		usedWidth += len(svcStr) + 2
+		parts = append(parts, StyleDim.Render("[")+highlightText(svc, highlights, StyleDim, "service")+StyleDim.Render("]"))
+		usedWidth += len(svc) + 2 + 2
 	}
 
-	// Extra fields
+	// Extra fields — collect for width calculation
 	skip := map[string]bool{
 		"timestamp": true, "ts": true, "time": true, "@timestamp": true,
 		"level": true, "lvl": true, "severity": true,
@@ -170,10 +175,13 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 		"service": true, "source": true, "datetime": true, "t": true, "loglevel": true, "text": true,
 	}
 
-	var extraStr string
+	type fieldPair struct{ key, val string }
+	var extras []fieldPair
+	extraWidth := 0
 	for k, v := range r.Fields {
 		if !skip[k] {
-			extraStr += "  " + k + "=" + v
+			extras = append(extras, fieldPair{k, v})
+			extraWidth += 2 + len(k) + 1 + len(v) // "  k=v"
 		}
 	}
 
@@ -185,21 +193,24 @@ func formatLogLine(r parser.Record, maxWidth int) string {
 			msg = msg[:idx]
 		}
 		// Reserve space for extras, then truncate message to fit
-		remaining := maxWidth - usedWidth - len(extraStr) - 1
+		remaining := maxWidth - usedWidth - extraWidth - 1
 		if remaining < 20 {
 			// Not enough room for extras, drop them and give full width to message
 			remaining = maxWidth - usedWidth - 1
-			extraStr = ""
+			extras = nil
 		}
 		if remaining > 0 && len(msg) > remaining {
 			msg = msg[:remaining-1] + "…"
 		}
-		parts = append(parts, lipgloss.NewStyle().Foreground(colorWhite).Render(msg))
+		msgStyle := lipgloss.NewStyle().Foreground(colorWhite)
+		parts = append(parts, highlightText(msg, highlights, msgStyle, "message"))
 	}
 
 	line := strings.Join(parts, "  ")
-	if extraStr != "" {
-		line += StyleDim.Render(extraStr)
+
+	// Render extras with highlighting on values
+	for _, e := range extras {
+		line += StyleDim.Render("  "+e.key+"=") + highlightText(e.val, highlights, StyleDim, e.key)
 	}
 
 	return line

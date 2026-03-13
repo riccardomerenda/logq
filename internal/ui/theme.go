@@ -28,6 +28,7 @@ var (
 	StyleHighlight = lipgloss.NewStyle().Background(colorBg).Foreground(colorWhite)
 	StyleDim       = lipgloss.NewStyle().Foreground(colorGray)
 	StyleTitle     = lipgloss.NewStyle().Foreground(colorPurple).Bold(true)
+	StyleMatch     = lipgloss.NewStyle().Background(lipgloss.Color("#F1FA8C")).Foreground(lipgloss.Color("#282A36")).Bold(true)
 
 	// Histogram
 	StyleHistBar   = lipgloss.NewStyle().Foreground(colorGreen)

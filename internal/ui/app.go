@@ -300,6 +300,8 @@ func (m *Model) executeQuery() {
 		m.results = m.index.AllIDs()
 		m.queryError = ""
 		m.queryBar.SetError("")
+		m.logView.SetHighlights(nil)
+		m.detail.SetHighlights(nil)
 	} else {
 		node, err := query.ParseQuery(m.queryStr)
 		if err != nil {
@@ -310,6 +312,10 @@ func (m *Model) executeQuery() {
 		m.results = query.Evaluate(node, m.index)
 		m.queryError = ""
 		m.queryBar.SetError("")
+
+		highlights := ExtractHighlightTerms(node)
+		m.logView.SetHighlights(highlights)
+		m.detail.SetHighlights(highlights)
 	}
 	m.queryTime = time.Since(start)
 

@@ -28,6 +28,7 @@ All original 6 phases are shipped. logq is a working, interactive terminal log e
 | Export & batch mode (`-q`, `-o`, `--format`, `--count`, `s` key) | Done (v0.4.0) |
 | Query history (Up/Down in filter bar, draft preservation) | Done (v0.4.0) |
 | Multiple file support (merged timeline, `source:filename`) | Done (v0.5.0) |
+| Match highlighting (search terms highlighted in log view + detail) | Done (v0.6.0) |
 
 ---
 
@@ -265,36 +266,41 @@ For fields with low cardinality (e.g., `level`, `service`), suggest values after
 ### Phase 12: Regex & Match Highlighting
 **Priority:** Medium — Visual feedback for what matched
 **Effort:** Medium
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
 #### 12.1 — Highlight matching text in log view
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-When a query is active, highlight the matching portions of each log line (bold, underline, or background color).
+When a query is active, matching portions of each log line are highlighted with bold yellow background (`StyleMatch`).
 
-**Files to modify:**
-- `internal/ui/logview.go` — in `formatLogLine()`, find matching substrings and wrap with highlight style
-- `internal/ui/theme.go` — add `StyleMatchHighlight`
+**Files modified:**
+- `internal/ui/highlight.go` — new file: `ExtractHighlightTerms()` walks the query AST, `highlightText()` applies styling to matched ranges
+- `internal/ui/logview.go` — `formatLogLine()` uses `highlightText()` for message, service, source, and extra field values
+- `internal/ui/theme.go` — added `StyleMatch` (Dracula yellow background, dark bold text)
 
 Matching logic:
-- Full-text search: highlight the search term in all fields
-- `field:value`: highlight the value in that field
-- `field~"regex"`: highlight the regex match
-- For AND/OR/NOT compounds: highlight all positive match terms
+- Full-text search: highlight the search term across all visible fields
+- `field:value`: highlight the value in that specific field only
+- `field~"regex"`: highlight the regex match in the target field
+- AND/OR compounds: all positive match terms are highlighted
+- NOT: negated terms are not highlighted
+- Numeric/time comparisons: no highlighting (no visible text to match)
+- Message field aliases (`msg`, `body`, `text`) are handled correctly
 
 #### 12.2 — Highlight in detail view
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-Apply the same highlighting in the record detail overlay.
+The same highlighting is applied in the record detail overlay for all field values.
 
-**Files to modify:**
-- `internal/ui/detail.go` — highlight matching field values
+**Files modified:**
+- `internal/ui/detail.go` — `highlightText()` applied to field values in the detail view
 
 #### 12.3 — Tests
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-- Search `error` → "error" substring highlighted in rendered output
-- Regex match → matched portion highlighted
+- `ExtractHighlightTerms`: full-text, field match, regex, AND/OR/NOT, numeric/time skipped
+- `findMatches`: case-insensitive, multiple matches, overlapping range merging, field-specific vs full-text, message aliases
+- `highlightText`: no terms → plain render, no match → plain render, match → styled differently
 - Field match → only matching field highlighted, not others
 - No query → no highlighting (clean render)
 

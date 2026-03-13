@@ -139,6 +139,17 @@ From highest to lowest:
 
 Use parentheses to override.
 
+## Match Highlighting
+
+When a query is active, matching text is highlighted in yellow in both the log view and the detail overlay. This helps you instantly see *why* each record matched.
+
+- **Full-text search** &#8212; the search term is highlighted across all visible fields (message, service, extra fields)
+- **Field match** (`field:value`) &#8212; the value is highlighted only within the matching field
+- **Regex match** (`field~"pattern"`) &#8212; the regex match is highlighted in the target field
+- **AND / OR** &#8212; all positive terms are highlighted simultaneously
+- **NOT** &#8212; negated terms are not highlighted (they represent exclusions)
+- **Numeric / time comparisons** &#8212; no text highlighting (these filter by value, not by visible text)
+
 ## Empty Query
 
 An empty filter bar matches all records &#8212; press `Escape` to clear.

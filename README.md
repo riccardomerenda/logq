@@ -44,6 +44,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 **logq** changes that. Point it at a file (or pipe logs in) and get:
 
 - **Instant filtering** &#8212; type a query, results update as you type
+- **Match highlighting** &#8212; matching text is highlighted in yellow so you can instantly see *why* each record matched
 - **Multiple files** &#8212; `logq app.log db.log` merges files into a unified timeline, with `source:filename` queries
 - **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
