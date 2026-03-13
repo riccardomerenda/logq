@@ -212,7 +212,8 @@ func (qb *QueryBar) View() string {
 	} else {
 		bar = qb.input.View()
 	}
-	if qb.errMsg != "" {
+	// Show error only when blurred (after Enter), not during live typing
+	if qb.errMsg != "" && !qb.input.Focused() {
 		bar += "\n" + StyleError.Render("  "+qb.errMsg)
 	}
 	return StyleQueryBar.Width(qb.width - 2).Render(bar)

@@ -318,6 +318,12 @@ func (m *Model) executeQuery() {
 	} else {
 		node, err := query.ParseQuery(m.queryStr)
 		if err != nil {
+			// While typing, silently keep previous results
+			if m.focus == FocusQueryBar {
+				m.queryBar.SetError("")
+				return
+			}
+			// After Enter (blurred), show the error
 			m.queryError = err.Error()
 			m.queryBar.SetError(err.Error())
 			return
