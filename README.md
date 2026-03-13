@@ -239,6 +239,32 @@ For unstructured plain text logs, logq extracts:
 - Time navigation uses **sorted indexes** &#8212; O(log n)
 - Full-text search scans sequentially with early exit &#8212; fast enough for millions of lines
 
+## Roadmap
+
+> See [docs/v2-roadmap.md](docs/v2-roadmap.md) for full details.
+
+### ✅ Shipped
+
+| Feature | Version |
+|---------|---------|
+| Core engine — multi-format parsing, indexing, query language | v0.1 |
+| Interactive TUI — log view, histogram, query bar, detail overlay | v0.2 |
+| Input flexibility — file, stdin, gzip, follow mode, multi-line | v0.3 |
+| Time queries (`last:5m`), batch export, query history | v0.4 |
+| Multi-file support with merged timeline | v0.5 |
+| Match highlighting, field auto-complete | v0.6 |
+
+### 🚧 Up Next
+
+| Feature | Description |
+|---------|-------------|
+| 🎨 Color themes | Auto-detect dark/light terminal, `--theme` flag |
+| 🍺 Homebrew tap | `brew install riccardomerenda/tap/logq` |
+| 📊 Aggregations | `--group-by service`, count, top-N |
+| 📋 Column mode | Configurable table view for structured logs |
+| 🔖 Bookmarks | Mark and navigate between interesting records |
+| 🔍 JSON drill-down | Collapsible nested objects in detail view |
+
 ## Building From Source
 
 ```bash

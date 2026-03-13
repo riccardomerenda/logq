@@ -1,592 +1,74 @@
-# logq v2 Roadmap — Implementation Plan
+# logq Roadmap
 
-## Current State (v1 — Complete)
+## Shipped
 
-All original 6 phases are shipped. logq is a working, interactive terminal log explorer with:
+| Version | Feature | Description |
+|---------|---------|-------------|
+| v0.1.0 | Core engine | Multi-format parsing (JSON, logfmt, plain text), in-memory indexing, query language |
+| v0.2.0 | Interactive TUI | Log view, histogram, query bar, status bar, record detail |
+| v0.3.0 | Input flexibility | File, stdin, gzip support, follow mode (`-f`), multi-line grouping |
+| v0.4.0 | Time queries & export | `timestamp>"..."`, `last:5m`, batch mode (`-q`, `-o`, `--format`), query history |
+| v0.5.0 | Multi-file support | Merged timeline from multiple files, `source:filename` queries |
+| v0.6.0 | Search UX | Match highlighting, field auto-complete with ghost text, demo GIF |
+| v0.6.1 | Code quality | Go 1.22, fix Bubbletea anti-patterns, remove dead code |
 
-| Feature | Status |
-|---|---|
-| Multi-format parsing (JSON, logfmt, plain text) | Done |
-| In-memory indexing (inverted, numeric, time) | Done |
-| Query language (field match, numeric, regex, boolean ops, parentheses) | Done |
-| Interactive TUI (log view, histogram, query bar, status bar) | Done |
-| Input (file, stdin, gzip) | Done |
-| Follow mode (`-f` for files) | Done |
-| Multi-line grouping (stack traces, exceptions) | Done |
-| Record detail view + copy to clipboard | Done |
-| Histogram with bucket selection (Tab + Enter to jump) | Done |
-| Self-update (`logq update`) | Done |
-| CI/CD (GitHub Actions) | Done |
-| GoReleaser (cross-platform binaries) | Done |
-| README with badges, docs, query reference | Done |
+## In Progress
 
-## v2 Features — Completed
+### 🎨 Color Themes
+Auto-detect terminal background and switch between dark/light palettes. Support `--theme` flag for manual override.
 
-| Feature | Status |
-|---|---|
-| Time range queries (`timestamp>"..."`, `last:5m`) | Done (v0.4.0) |
-| Export & batch mode (`-q`, `-o`, `--format`, `--count`, `s` key) | Done (v0.4.0) |
-| Query history (Up/Down in filter bar, draft preservation) | Done (v0.4.0) |
-| Multiple file support (merged timeline, `source:filename`) | Done (v0.5.0) |
-| Match highlighting (search terms highlighted in log view + detail) | Done (v0.6.0) |
-| Field auto-complete (Tab completion for field names + value suggestions) | Done (v0.6.0) |
-| Demo GIF (VHS tape script + README integration) | Done (v0.6.0) |
+### 💾 Persistent Query History
+Save history to `~/.local/share/logq/history` so queries survive across sessions.
 
----
+## Planned
 
-## v2 Features — Planned
+### High Priority
 
-### Phase 7: Time Range Queries
-**Priority:** High — Infrastructure exists, just needs query syntax exposure
-**Effort:** Medium
-**Status:** [x] Complete
+#### 🍺 Homebrew Distribution
+Publish a Homebrew tap so users can `brew install riccardomerenda/tap/logq` without needing Go installed. Integrate with GoReleaser for automatic formula updates on release.
 
-The index already has `TimeRange(start, end)` with binary search. This phase exposes it to users via the query language.
-
-#### 7.1 — Time range operators in query syntax
-**Status:** [x] Complete
-
-Add support for these query patterns:
+#### 📊 Aggregations
+Group-by and count operations for quick analytics:
 ```
-timestamp>"2026-03-08T10:00:00"        # after a specific time
-timestamp<"2026-03-08T11:00:00"        # before a specific time
-timestamp>"10:00" AND timestamp<"11:00" # time-only (relative to file's date)
+logq server.log -q "level:error" --group-by service
+logq server.log -q "latency>1000" --group-by path --top 10
 ```
 
-**Files to modify:**
-- `internal/query/lexer.go` — recognize timestamp-like values after `>`, `<`, `>=`, `<=` operators on the `timestamp` field
-- `internal/query/evaluator.go` — route timestamp comparisons to `index.TimeRange()` instead of numeric index
-- `internal/index/index.go` — add `TimeBefore(t)`, `TimeAfter(t)` methods returning `[]int`
-
-#### 7.2 — Relative time shorthand
-**Status:** [x] Complete
-
-Add convenience syntax for common time filters:
-```
-last:5m          # last 5 minutes
-last:1h          # last 1 hour
-last:30s         # last 30 seconds
-last:2d          # last 2 days
-```
-
-**Files to modify:**
-- `internal/query/lexer.go` — tokenize `last:` as a special field with duration value
-- `internal/query/parser.go` — parse `last:Xunit` into a time range AST node
-- `internal/query/evaluator.go` — resolve relative time against `time.Now()` and use time index
-
-#### 7.3 — Tests
-**Status:** [x] Complete
-
-- Parse `timestamp>"2026-03-08T10:00:00"` → correct AST with time comparison
-- Parse `last:5m` → correct relative time node
-- Evaluate time range queries against index → correct record subset
-- Edge cases: `last:0s`, `last:999d`, invalid formats → meaningful errors
-- Combine with other queries: `level:error AND last:1h`
-
-#### 7.4 — Update query-syntax.md documentation
-**Status:** [x] Complete
-
-Add "Time Range Queries" section to `docs/query-syntax.md` with examples.
-
----
-
-### Phase 8: Export Filtered Results
-**Priority:** High — Users need to share/save findings
-**Effort:** Low
-**Status:** [x] Complete
-
-#### 8.1 — CLI export mode (non-interactive)
-**Status:** [x] Complete
-
-Add flags for headless/batch export:
+#### 📋 Column Mode
+Display structured logs as a configurable table:
 ```bash
-logq server.log -q "level:error" -o errors.jsonl    # write matches to file
-logq server.log -q "level:error" --format json       # output format (json, raw, csv)
-logq server.log -q "latency>1000" --count            # just print match count
+logq server.log --columns ts,level,service,message
 ```
 
-**Files to modify:**
-- `main.go` — add `-q`, `-o`, `--format`, `--count` flags
-- `main.go` — when `-q` is set, skip TUI: parse → index → query → write output → exit
-- New file: `internal/output/writer.go` — format and write matched records
+### Medium Priority
 
-Supported output formats:
-- `json` — one JSON object per line (re-serialize from parsed fields)
-- `raw` — original log lines as-is
-- `csv` — header row + values (field order from first record)
+#### 🔖 Bookmarks
+Mark interesting records with `m`, navigate between them with `'`, filter to bookmarks-only with `B`. Useful for long debugging sessions.
 
-#### 8.2 — TUI export keybinding
-**Status:** [x] Complete
+#### 🔍 JSON Drill-Down
+Collapsible nested objects in the detail view. Expand/collapse with Enter, copy dot-paths (`request.headers.host`).
 
-Add `s` key to save current filtered results to a file from within the TUI.
-
-**Files to modify:**
-- `internal/ui/keys.go` — add Save keybinding
-- `internal/ui/app.go` — handle save: prompt for filename (or auto-generate `logq-export-TIMESTAMP.jsonl`), write filtered records
-- `internal/ui/statusbar.go` — show "Saved N records to file" confirmation
-
-#### 8.3 — Tests
-**Status:** [x] Complete
-
-- CLI mode: `-q "level:error" -o out.jsonl` produces correct file
-- JSON/raw/CSV output formats produce valid output
-- `--count` prints number only
-- Empty result set produces empty file (not error)
-- TUI save writes correct records
-
----
-
-### Phase 9: Multiple File Support
-**Priority:** High — Very common real-world need
-**Effort:** Medium
-**Status:** [x] Complete
-
-#### 9.1 — Accept multiple file arguments
-**Status:** [x] Complete
-
-```bash
-logq app.log db.log auth.log        # multiple explicit files
-logq /var/log/app/*.log             # glob expansion (shell does this)
-logq app.log.1.gz app.log.2.gz     # mixed gzip and plain
+#### ⚡ Query Aliases
+Built-in and user-defined shortcuts:
+```
+@err    → level:error OR level:fatal
+@slow   → latency>1000
 ```
 
-**Files to modify:**
-- `main.go` — accept `args[0:]` instead of `args[0]`, iterate and read all
-- `internal/input/reader.go` — add `NewMultiFileReader(paths []string)` that concatenates readers
-- `internal/parser/parser.go` — add `Source` field to `Record` (filename origin)
-
-#### 9.2 — Merge and sort by timestamp
-**Status:** [x] Complete
-
-Records from multiple files should be interleaved by timestamp for a unified timeline.
-
-**Files to modify:**
-- `internal/index/index.go` — after building, sort records by timestamp if multi-file
-- `internal/ui/logview.go` — show source file indicator: `[app.log]` prefix or color-coded
-
-#### 9.3 — Source file as queryable field
-**Status:** [x] Complete
-
-```
-source:app.log AND level:error       # errors from specific file
-source~"auth.*" AND latency>500      # from auth-related files
-```
-
-**Files to modify:**
-- `internal/parser/parser.go` — populate `source` field in Record.Fields
-- Index automatically picks it up (no index changes needed)
-
-#### 9.4 — Tests
-**Status:** [x] Complete
-
-- Two files with overlapping timestamps → merged in correct order
-- `source:filename` query works
-- Mixed gzip + plain files work together
-- File with no timestamps → appended after timestamped records
-- Single file still works as before (no regression)
-
----
-
-### Phase 10: Query History
-**Priority:** Medium — Low effort, high quality-of-life
-**Effort:** Low
-**Status:** [x] Complete (in-session), [ ] Persistent history not yet
-
-#### 10.1 — In-session query history
-**Status:** [x] Complete
-
-Up/Down arrows in the query bar recall previous queries (when query bar is focused).
-Draft text is preserved when entering history mode and restored when navigating past the end.
-
-**Files modified:**
-- `internal/ui/querybar.go` — added `history []string`, `historyIdx int`, `draft string`; `PushHistory()`, `HistoryUp()`, `HistoryDown()`
-- `internal/ui/app.go` — pushes to history on Enter, handles Up/Down keys in query bar focus
-
-#### 10.2 — Persistent history (optional)
-**Status:** [ ] Not started
-
-Save query history to `~/.local/share/logq/history` (XDG-compliant). Load on startup. Cap at 100 entries.
-
-**Files to create:**
-- `internal/config/history.go` — load/save history file, dedup, cap size
-
-#### 10.3 — Tests
-**Status:** [x] Complete
-
-- Type query → execute → Up arrow → previous query shown
-- Multiple queries → navigate full history
-- Down arrow past end → restores draft
-- Dedup consecutive entries
-- Empty string ignored
-- Cap at 100 entries
-- Blur resets history index
-
----
-
-### Phase 11: Field Auto-Complete
-**Priority:** Medium — Helps discoverability on unfamiliar logs
-**Effort:** Medium
-**Status:** [x] Complete
-
-#### 11.1 — Tab completion for field names
-**Status:** [x] Complete
-
-When the cursor is at a word boundary in the query bar, pressing Tab accepts the inline ghost-text suggestion. Field names are completed with `:` appended automatically. Keywords (`AND`, `OR`, `NOT`, `last`) are also completable.
-
-**Files created:**
-- `internal/ui/completer.go` — `Completer` struct, `extractCompletionContext()` to parse cursor context, `computeCandidates()` to match against index
-
-**Files modified:**
-- `internal/index/index.go` — added `FieldNames()` and `FieldValues(field)` methods
-- `internal/ui/querybar.go` — added `UpdateCompletions()`, `AcceptCompletion()`, ghost text rendering in `View()`
-- `internal/ui/app.go` — Tab handling in query bar focus, `UpdateCompletions()` called after text changes
-
-#### 11.2 — Completion popup (stretch)
-**Status:** [ ] Not started (deferred — inline ghost text is sufficient for now)
-
-#### 11.3 — Value suggestions for known fields
-**Status:** [x] Complete
-
-For fields with low cardinality (50 or fewer unique values), typing `field:` shows value suggestions. High-cardinality fields (e.g., `request_id`) are excluded.
-
-**Files modified:**
-- `internal/index/index.go` — `FieldValues(field)` returns nil for high-cardinality fields (>50 values)
-
-#### 11.4 — Tests
-**Status:** [x] Complete
-
-- `extractCompletionContext`: partial field, field:value, after operators, after parens, cursor in middle, quoted strings
-- `computeCandidates`: field names, field values, keywords, empty prefix, no match
-- `Completer`: ghost suffix (field name with colon, value without), cycling, reset
-- `FieldNames`: sorted, contains expected fields
-- `FieldValues`: returns values for low-cardinality fields, nil for high-cardinality
-
----
-
-### Phase 12: Regex & Match Highlighting
-**Priority:** Medium — Visual feedback for what matched
-**Effort:** Medium
-**Status:** [x] Complete
-
-#### 12.1 — Highlight matching text in log view
-**Status:** [x] Complete
-
-When a query is active, matching portions of each log line are highlighted with bold yellow background (`StyleMatch`).
-
-**Files modified:**
-- `internal/ui/highlight.go` — new file: `ExtractHighlightTerms()` walks the query AST, `highlightText()` applies styling to matched ranges
-- `internal/ui/logview.go` — `formatLogLine()` uses `highlightText()` for message, service, source, and extra field values
-- `internal/ui/theme.go` — added `StyleMatch` (Dracula yellow background, dark bold text)
-
-Matching logic:
-- Full-text search: highlight the search term across all visible fields
-- `field:value`: highlight the value in that specific field only
-- `field~"regex"`: highlight the regex match in the target field
-- AND/OR compounds: all positive match terms are highlighted
-- NOT: negated terms are not highlighted
-- Numeric/time comparisons: no highlighting (no visible text to match)
-- Message field aliases (`msg`, `body`, `text`) are handled correctly
-
-#### 12.2 — Highlight in detail view
-**Status:** [x] Complete
-
-The same highlighting is applied in the record detail overlay for all field values.
-
-**Files modified:**
-- `internal/ui/detail.go` — `highlightText()` applied to field values in the detail view
-
-#### 12.3 — Tests
-**Status:** [x] Complete
-
-- `ExtractHighlightTerms`: full-text, field match, regex, AND/OR/NOT, numeric/time skipped
-- `findMatches`: case-insensitive, multiple matches, overlapping range merging, field-specific vs full-text, message aliases
-- `highlightText`: no terms → plain render, no match → plain render, match → styled differently
-- Field match → only matching field highlighted, not others
-- No query → no highlighting (clean render)
-
----
-
-### Phase 13: Color Themes
-**Priority:** Medium — Light terminal users struggle with dark-only themes
-**Effort:** Low
-**Status:** [ ] Not started
-
-#### 13.1 — Built-in theme selection
-**Status:** [ ] Not started
-
-```bash
-logq server.log --theme light
-logq server.log --theme dracula      # current default
-logq server.log --theme monokai
-```
-
-**Files to modify:**
-- `internal/ui/theme.go` — refactor hardcoded colors into `Theme` struct; define 3-4 built-in themes (dracula, light, monokai, nord)
-- `main.go` — add `--theme` flag, pass to UI init
-- `internal/ui/app.go` — accept theme in model init
-
-#### 13.2 — Auto-detect terminal background
-**Status:** [ ] Not started
-
-Use `lipgloss.HasDarkBackground()` to default to light/dark theme automatically.
-
-**Files to modify:**
-- `internal/ui/theme.go` — check terminal background on init, pick default theme
-
-#### 13.3 — Tests
-**Status:** [ ] Not started
-
-- Each theme produces valid lipgloss styles (no panics)
-- `--theme invalid` shows error with available themes
-- Default theme auto-selection doesn't crash on any terminal
-
----
-
-### Phase 14: Bookmarks
-**Priority:** Low — Nice to have for long debugging sessions
-**Effort:** Low
-**Status:** [ ] Not started
-
-#### 14.1 — Toggle bookmark on current record
-**Status:** [ ] Not started
-
-Press `m` to bookmark/unbookmark the selected log line. Bookmarked lines get a visual marker (e.g., `*` or colored dot).
-
-**Files to modify:**
-- `internal/ui/app.go` — add `bookmarks map[int]bool` to model; handle `m` key
-- `internal/ui/logview.go` — render bookmark indicator
-- `internal/ui/keys.go` — add bookmark keybinding
-
-#### 14.2 — Navigate between bookmarks
-**Status:** [ ] Not started
-
-Press `'` (single quote) to jump to the next bookmark. `Shift+'` for previous.
-
-**Files to modify:**
-- `internal/ui/app.go` — find next/prev bookmarked record index, scroll to it
-
-#### 14.3 — Filter to bookmarked records only
-**Status:** [ ] Not started
-
-Press `B` to toggle showing only bookmarked records.
-
-**Files to modify:**
-- `internal/ui/app.go` — apply bookmark filter on top of query filter
-
-#### 14.4 — Tests
-**Status:** [ ] Not started
-
-- Bookmark a record → marker visible
-- Navigate to next bookmark → correct record
-- Filter bookmarks only → only bookmarked records shown
-- Bookmark + query filter → intersection works correctly
-
----
-
-### Phase 15: JSON Drill-Down in Detail View
-**Priority:** Low — Useful for deeply nested JSON logs
-**Effort:** Medium
-**Status:** [ ] Not started
-
-#### 15.1 — Collapsible nested fields
-**Status:** [ ] Not started
-
-In detail view, nested JSON objects can be expanded/collapsed with Enter or arrow keys.
-
-```
-  timestamp   2026-03-08T10:00:04Z
-  level       error
-▸ request     {3 fields}              ← collapsed
-  message     connection refused
-```
-
-Pressing Enter on `request`:
-```
-▾ request
-    method    GET
-    path      /users
-    headers   {2 fields}              ← still collapsed
-  message     connection refused
-```
-
-**Files to modify:**
-- `internal/ui/detail.go` — rewrite from flat list to tree model with expand/collapse state
-- `internal/parser/json.go` — preserve nested structure (currently flattened); add `RawJSON` or structured field to Record
-
-#### 15.2 — Copy nested path
-**Status:** [ ] Not started
-
-Press `c` on a nested field to copy its dot-path and value (e.g., `request.headers.host: "api.example.com"`).
-
-**Files to modify:**
-- `internal/ui/detail.go` — track selected field path, copy formatted
-
-#### 15.3 — Tests
-**Status:** [ ] Not started
-
-- Nested JSON → collapsible tree in detail view
-- Expand/collapse toggles correctly
-- Deeply nested (5+ levels) doesn't break layout
-- Non-JSON records → flat display (no regression)
-
----
-
-### Phase 16: Config File
-**Priority:** Low — "Zero config" is a feature, but power users want defaults
-**Effort:** Low
-**Status:** [ ] Not started
-
-#### 16.1 — Optional config file
-**Status:** [ ] Not started
-
-Support `~/.config/logq/config.toml` (XDG-compliant). Entirely optional — logq works without it.
-
-```toml
-# ~/.config/logq/config.toml
-theme = "light"
-default_query = "NOT level:debug"
-
-[aliases]
-err = "level:error OR level:fatal"
-slow = "latency>1000"
-```
-
-**Files to create:**
-- `internal/config/config.go` — load config, merge with CLI flags (flags win)
-
-**Files to modify:**
-- `main.go` — load config before parsing flags, apply defaults
-
-#### 16.2 — Query aliases
-**Status:** [ ] Not started
-
-```
-@err                    # expands to level:error OR level:fatal
-@slow AND service:api   # expands inline
-```
-
-**Files to modify:**
-- `internal/query/lexer.go` — recognize `@alias` tokens
-- `internal/query/parser.go` — expand aliases before parsing
-- `internal/config/config.go` — load aliases from config
-
-#### 16.3 — Tests
-**Status:** [ ] Not started
-
-- Config loads correctly
-- Missing config file → no error, defaults apply
-- CLI flags override config values
-- Query aliases expand correctly
-- Circular alias → error, not infinite loop
-
----
-
-### Phase 17: Homebrew Tap
-**Priority:** Low — Distribution convenience
-**Effort:** Low
-**Status:** [ ] Not started
-
-#### 17.1 — Create Homebrew tap repository
-**Status:** [ ] Not started
-
-Create `homebrew-tap` repo with formula:
-```ruby
-class Logq < Formula
-  desc "Fast, interactive terminal log explorer"
-  homepage "https://github.com/riccardomerenda/logq"
-  url "https://github.com/riccardomerenda/logq/releases/download/v#{version}/logq_#{version}_darwin_amd64.tar.gz"
-  # ...
-end
-```
-
-#### 17.2 — GoReleaser Homebrew integration
-**Status:** [ ] Not started
-
-Add to `.goreleaser.yml`:
-```yaml
-brews:
-  - repository:
-      owner: riccardomerenda
-      name: homebrew-tap
-    homepage: "https://github.com/riccardomerenda/logq"
-    description: "Fast, interactive terminal log explorer"
-```
-
-**Files to modify:**
-- `.goreleaser.yml` — add `brews` section
-
-#### 17.3 — Install instructions
-**Status:** [ ] Not started
-
-Update README:
-```bash
-brew install riccardomerenda/tap/logq
-```
-
----
-
-### Phase 18: Demo GIF
-**Priority:** Low — Important for GitHub discoverability
-**Effort:** Low
-**Status:** [x] Complete (tape script + README wired; run `vhs demo.tape` to generate)
-
-#### 18.1 — Create VHS tape file
-**Status:** [x] Complete
-
-**Files created:**
-- `demo.tape` — VHS script showcasing: open file → scroll → live filter with highlighting → auto-complete (Tab) → detail view → quit
-
-#### 18.2 — Add to README
-**Status:** [x] Complete
-
-README updated to show `demo.gif` in place of the ASCII art diagram. The GIF will appear after running `vhs demo.tape`.
-
----
-
-## Implementation Priority Matrix
-
-```
-                        Low Effort ──────────────── High Effort
-                        │                                    │
-  High    ┌─────────────┼────────────────────────────────────┤
-  Value   │  Phase 10   │  Phase 7    Phase 9                │
-          │  (history)  │  (time)     (multi-file)           │
-          │  Phase 8    │                                    │
-          │  (export)   │                                    │
-          ├─────────────┼────────────────────────────────────┤
-  Medium  │  Phase 13   │  Phase 11   Phase 12               │
-  Value   │  (themes)   │  (complete) (highlight)            │
-          │  Phase 18   │                                    │
-          │  (demo gif) │                                    │
-          ├─────────────┼────────────────────────────────────┤
-  Low     │  Phase 14   │  Phase 15   Phase 16               │
-  Value   │  (bookmark) │  (drill)    (config)               │
-          │  Phase 17   │                                    │
-          │  (homebrew) │                                    │
-          └─────────────┴────────────────────────────────────┘
-```
-
-## Suggested Implementation Order
-
-| Order | Phase | Feature | Why |
-|---|---|---|---|
-| 1 | 8 | Export filtered results | Low effort, immediately useful, enables scripting |
-| 2 | 10 | Query history | Very low effort, big UX win |
-| 3 | 7 | Time range queries | Infrastructure already exists, high impact |
-| 4 | 9 | Multiple file support | Common real-world need |
-| 5 | 13 | Color themes | Quick win for light terminal users |
-| 6 | 12 | Regex highlighting | Visual feedback improves query confidence |
-| 7 | 11 | Field auto-complete | Discoverability for new users |
-| 8 | 14 | Bookmarks | Nice for long debugging sessions |
-| 9 | 18 | Demo GIF | GitHub discoverability |
-| 10 | 17 | Homebrew tap | Distribution convenience |
-| 11 | 15 | JSON drill-down | Useful but niche (deeply nested logs) |
-| 12 | 16 | Config file | Power user feature, keep zero-config default |
-
----
-
-## Status Legend
-
-- `[x]` Complete
-- `[~]` Partial / in progress
-- `[ ]` Not started
+### Future Ideas
+
+| Idea | Description |
+|------|-------------|
+| Cloud streaming | Direct integration with `kubectl logs`, CloudWatch, etc. |
+| Saved views | Per-project presets: query + columns + theme in `.logq.toml` |
+| Web playground | Browser-based demo where users can paste logs and try logq |
+| Plugin system | Custom parsers for proprietary log formats |
+
+## Design Principles
+
+These guide every decision:
+
+1. **Zero config** — logq works out of the box, always
+2. **Single binary** — no runtime dependencies, no setup
+3. **Speed first** — O(1) field lookups, O(log n) range queries, binary search everywhere
+4. **Terminal-native** — no Electron, no browser, no cloud account required
