@@ -30,6 +30,7 @@ All original 6 phases are shipped. logq is a working, interactive terminal log e
 | Multiple file support (merged timeline, `source:filename`) | Done (v0.5.0) |
 | Match highlighting (search terms highlighted in log view + detail) | Done (v0.6.0) |
 | Field auto-complete (Tab completion for field names + value suggestions) | Done (v0.6.0) |
+| Demo GIF (VHS tape script + README integration) | Done (v0.6.0) |
 
 ---
 
@@ -527,48 +528,18 @@ brew install riccardomerenda/tap/logq
 ### Phase 18: Demo GIF
 **Priority:** Low — Important for GitHub discoverability
 **Effort:** Low
-**Status:** [ ] Not started
+**Status:** [x] Complete (tape script + README wired; run `vhs demo.tape` to generate)
 
 #### 18.1 — Create VHS tape file
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-Use [vhs](https://github.com/charmbracelet/vhs) to record a terminal demo.
-
-**Files to create:**
-- `demo.tape` — VHS script showing: open file → scroll → type query → filter → inspect detail → quit
-
-```
-Output demo.gif
-Set Width 1200
-Set Height 600
-Set FontSize 14
-Set Theme "Dracula"
-
-Type "logq testdata/sample.jsonl"
-Enter
-Sleep 2s
-Type "/"
-Sleep 500ms
-Type "level:error"
-Sleep 2s
-Type " AND latency>100"
-Sleep 3s
-Escape
-Sleep 1s
-Down Down Down
-Enter
-Sleep 3s
-Escape
-Type "q"
-```
+**Files created:**
+- `demo.tape` — VHS script showcasing: open file → scroll → live filter with highlighting → auto-complete (Tab) → detail view → quit
 
 #### 18.2 — Add to README
-**Status:** [ ] Not started
+**Status:** [x] Complete
 
-Replace ASCII art with GIF:
-```markdown
-![logq demo](demo.gif)
-```
+README updated to show `demo.gif` in place of the ASCII art diagram. The GIF will appear after running `vhs demo.tape`.
 
 ---
 

@@ -23,19 +23,9 @@
 
 ---
 
-```
-+-----------------------------------------------------------+------------------+
-| 10:00:01  ERROR  [auth]  token expired  user=u_882        |  Timeline        |
-| 10:00:02  INFO   [api]   request ok  latency=45           |  10:00 ####  12  |
-| 10:00:03  ERROR  [api]   connection refused  retries=3    |  10:01 ######  8 |
-| 10:00:04  WARN   [db]    slow query  latency=1523         |  10:02 ####  15  |
-| 10:00:05  INFO   [auth]  login ok  method=oauth           |  10:03 ##     4  |
-+-----------------------------------------------------------+------------------+
-| Filter: level:error AND latency>500                                          |
-+------------------------------------------------------------------------------+
-| 47 matches / 12,302 total  |  query: 0.2ms  |  server.log (3.2MB)           |
-+------------------------------------------------------------------------------+
-```
+<p align="center">
+  <img src="demo.gif" alt="logq demo" width="960">
+</p>
 
 ## Why logq?
 
