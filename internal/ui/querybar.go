@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/riccardomerenda/logq/internal/index"
 )
 
@@ -27,7 +26,7 @@ func NewQueryBar() QueryBar {
 	ti.Placeholder = "Type a filter... (level:error AND latency>500)"
 	ti.CharLimit = 500
 	ti.Prompt = "Filter: "
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(colorPurple)
+	ti.PromptStyle = StyleBase.Copy().Foreground(colorPurple)
 
 	return QueryBar{
 		input:      ti,
@@ -79,6 +78,17 @@ func (qb *QueryBar) TextInput() *textinput.Model {
 	return &qb.input
 }
 
+// SetHistory replaces the internal history slice (used for loading persistent history).
+func (qb *QueryBar) SetHistory(entries []string) {
+	qb.history = entries
+	qb.historyIdx = -1
+}
+
+// History returns the current history entries.
+func (qb *QueryBar) History() []string {
+	return qb.history
+}
+
 // PushHistory adds a query to the history (deduplicates consecutive entries).
 func (qb *QueryBar) PushHistory(q string) {
 	if q == "" {
@@ -88,9 +98,9 @@ func (qb *QueryBar) PushHistory(q string) {
 		return
 	}
 	qb.history = append(qb.history, q)
-	// Cap at 100 entries
-	if len(qb.history) > 100 {
-		qb.history = qb.history[len(qb.history)-100:]
+	// Cap at 500 entries
+	if len(qb.history) > 500 {
+		qb.history = qb.history[len(qb.history)-500:]
 	}
 	qb.historyIdx = -1
 }

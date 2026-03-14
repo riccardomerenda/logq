@@ -72,7 +72,7 @@ func (d *DetailView) View() string {
 		}
 	}
 
-	valStyle := lipgloss.NewStyle().Foreground(colorWhite)
+	valStyle := StyleBase.Copy().Foreground(colorWhite)
 	for _, k := range keys {
 		v := r.Fields[k]
 		keyStr := fmt.Sprintf("  %-*s", maxKeyLen+2, k)
@@ -100,7 +100,7 @@ func (d *DetailView) View() string {
 
 	content := b.String()
 
-	return lipgloss.NewStyle().
+	return StyleBase.Copy().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorPurple).
 		Padding(1, 2).

@@ -41,7 +41,10 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Time histogram** &#8212; see log volume and error spikes at a glance
 - **Record detail** &#8212; press Enter to inspect any log line, `c` to copy to clipboard
 - **Export & batch mode** &#8212; `logq -q "level:error" -o errors.jsonl` for scripting, or press `s` to save from the TUI
-- **Query history** &#8212; Up/Down arrows in the filter bar to recall previous queries
+- **Aggregations** &#8212; `--group-by service --top 5` for quick field-value summaries
+- **Column mode** &#8212; `--columns timestamp,level,service,message` for a structured table view
+- **Color themes** &#8212; auto-detects dark/light terminal, or set `--theme dark` / `--theme light`
+- **Persistent query history** &#8212; queries are saved across sessions; Up/Down arrows to recall
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text
 - **Single binary** &#8212; no dependencies, no config files, just run it
@@ -52,6 +55,13 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 # Go
 go install github.com/riccardomerenda/logq@latest
 
+# Homebrew (macOS / Linux)
+brew install riccardomerenda/tap/logq
+
+# Scoop (Windows)
+scoop bucket add logq https://github.com/riccardomerenda/scoop-bucket
+scoop install logq
+
 # Or download a binary from GitHub Releases
 # https://github.com/riccardomerenda/logq/releases
 ```
@@ -61,6 +71,12 @@ go install github.com/riccardomerenda/logq@latest
 ```bash
 # If installed via go install
 logq update
+
+# Homebrew
+brew upgrade logq
+
+# Scoop
+scoop update logq
 
 # Or manually
 go install github.com/riccardomerenda/logq@latest
@@ -103,9 +119,19 @@ logq server.log -q "latency>1000" --format csv
 
 # Count matches only
 logq server.log -q "level:error" --count
+
+# Aggregations — group by field and show counts
+logq server.log --group-by level
+logq server.log -q "level:error" --group-by service --top 5
+logq server.log --group-by level --format json
+
+# Column mode — select specific fields
+logq server.log -q "level:error" --columns timestamp,level,message --format csv
 ```
 
 In the TUI, press `s` to save the current filtered results to a file.
+
+The `--columns` flag also works in TUI mode, rendering a structured table view.
 
 ## Multiple Files
 
@@ -253,15 +279,12 @@ For unstructured plain text logs, logq extracts:
 | Time queries (`last:5m`), batch export, query history | v0.4 |
 | Multi-file support with merged timeline | v0.5 |
 | Match highlighting, field auto-complete | v0.6 |
+| Persistent history, color themes, aggregations, column mode, Homebrew & Scoop | v0.7 |
 
 ### 🚧 Up Next
 
 | Feature | Description |
 |---------|-------------|
-| 🎨 Color themes | Auto-detect dark/light terminal, `--theme` flag |
-| 🍺 Homebrew tap | `brew install riccardomerenda/tap/logq` |
-| 📊 Aggregations | `--group-by service`, count, top-N |
-| 📋 Column mode | Configurable table view for structured logs |
 | 🔖 Bookmarks | Mark and navigate between interesting records |
 | 🔍 JSON drill-down | Collapsible nested objects in detail view |
 
@@ -305,7 +328,8 @@ logq/
 │   ├── parser/                 # JSON, logfmt, plain text, timestamps
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
-│   ├── output/                 # Export writers (raw, JSON, CSV)
+│   ├── history/                # Persistent query history
+│   ├── output/                 # Export writers (raw, JSON, CSV, aggregations)
 │   └── ui/                     # Bubbletea TUI components
 ├── benchmarks/                 # Performance benchmarks
 └── testdata/                   # Sample log files for testing

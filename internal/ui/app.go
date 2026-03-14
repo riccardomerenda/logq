@@ -10,7 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
 	"github.com/riccardomerenda/logq/internal/output"
@@ -69,6 +69,12 @@ type Model struct {
 	// Follow mode
 	followReader *input.FollowReader
 	following    bool
+
+	// Persistent history
+	historyPath string
+
+	// Column mode
+	columns []string
 }
 
 // NewModel creates a new app model.
@@ -98,6 +104,19 @@ func (m *Model) SetFollowReader(fr *input.FollowReader) {
 	m.followReader = fr
 	m.following = true
 }
+
+// SetHistory loads persistent history entries and sets the history file path.
+func (m *Model) SetHistory(entries []string, path string) {
+	m.historyPath = path
+	m.queryBar.SetHistory(entries)
+}
+
+// SetColumns sets the column names for column mode display.
+func (m *Model) SetColumns(cols []string) {
+	m.columns = cols
+	m.logView.SetColumns(cols)
+}
+
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
@@ -186,7 +205,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focus = FocusLogView
 			return m, nil
 		case key.Matches(msg, m.keys.Enter):
-			m.queryBar.PushHistory(m.queryBar.Value())
+			q := m.queryBar.Value()
+			m.queryBar.PushHistory(q)
+			if m.historyPath != "" && q != "" {
+				_ = history.Append(m.historyPath, q)
+			}
 			m.executeQuery()
 			m.queryBar.Blur()
 			m.focus = FocusLogView
@@ -381,7 +404,7 @@ func (m *Model) updateLayout() {
 	if histWidth > 40 {
 		histWidth = 40
 	}
-	logWidth := m.width - histWidth - 1 // 1 for separator
+	logWidth := m.width - histWidth - 2 // 2 for separator
 
 	contentHeight := m.height - 4 // query bar + status bar + borders
 
@@ -461,21 +484,33 @@ func (m Model) View() string {
 	}
 
 	// Main layout: log view (left) | histogram (right)
+	// Manual horizontal join to ensure styled separators on every line
 	logContent := m.logView.View()
 	histContent := m.histogram.View()
+	logLines := strings.Split(logContent, "\n")
+	histLines := strings.Split(histContent, "\n")
+	sep := StyleBase.Render("  ")
 
-	mainPanel := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		logContent,
-		"  ",
-		histContent,
-	)
+	lineCount := len(logLines)
+	if len(histLines) > lineCount {
+		lineCount = len(histLines)
+	}
+	mainLines := make([]string, lineCount)
+	for i := 0; i < lineCount; i++ {
+		ll := ""
+		if i < len(logLines) {
+			ll = logLines[i]
+		}
+		hl := ""
+		if i < len(histLines) {
+			hl = histLines[i]
+		}
+		mainLines[i] = ll + sep + hl
+	}
 
 	// Stack: main panel, query bar, status bar
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		mainPanel,
-		m.queryBar.View(),
-		m.statusBar.View(),
-	)
+	content := strings.Join(mainLines, "\n") + "\n" +
+		m.queryBar.View() + "\n" +
+		m.statusBar.View()
+	return RenderAppBackground(content, m.width, m.height)
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/riccardomerenda/logq/internal/parser"
 )
 
@@ -17,6 +16,8 @@ type LogView struct {
 	width      int
 	height     int
 	highlights []HighlightTerm
+	columns    []string // column mode field names
+	colWidths  []int    // computed column widths
 }
 
 // NewLogView creates a new log view.
@@ -39,11 +40,20 @@ func (lv *LogView) SetResults(records []parser.Record, results []int) {
 		lv.cursor = 0
 		lv.offset = 0
 	}
+	if len(lv.columns) > 0 {
+		lv.computeColumnWidths()
+	}
 }
 
 // SetHighlights sets the terms to highlight in log output.
 func (lv *LogView) SetHighlights(h []HighlightTerm) {
 	lv.highlights = h
+}
+
+// SetColumns sets the column names for table rendering mode.
+func (lv *LogView) SetColumns(cols []string) {
+	lv.columns = cols
+	lv.computeColumnWidths()
 }
 
 // ScrollUp moves the cursor up.
@@ -102,8 +112,20 @@ func (lv *LogView) ensureVisible() {
 // View renders the log view.
 func (lv *LogView) View() string {
 	if len(lv.results) == 0 {
-		msg := StyleDim.Render("  No matching records")
-		return msg + strings.Repeat("\n", max(0, lv.height-1))
+		emptyLine := StyleBase.Render(strings.Repeat(" ", lv.width))
+		msg := padLine(StyleDim.Render("  No matching records"), lv.width)
+		var b strings.Builder
+		b.WriteString(msg)
+		for i := 1; i < lv.height; i++ {
+			b.WriteString("\n")
+			b.WriteString(emptyLine)
+		}
+		return b.String()
+	}
+
+	// Column mode
+	if len(lv.columns) > 0 {
+		return lv.viewColumns()
 	}
 
 	var b strings.Builder
@@ -119,6 +141,8 @@ func (lv *LogView) View() string {
 
 		if i == lv.cursor {
 			line = StyleHighlight.Width(lv.width).Render(line)
+		} else {
+			line = padLine(line, lv.width)
 		}
 
 		b.WriteString(line)
@@ -127,10 +151,12 @@ func (lv *LogView) View() string {
 		}
 	}
 
-	// Pad remaining lines
+	// Pad remaining lines with background
 	rendered := end - lv.offset
+	emptyLine := StyleBase.Render(strings.Repeat(" ", lv.width))
 	for i := rendered; i < lv.height; i++ {
 		b.WriteString("\n")
+		b.WriteString(emptyLine)
 	}
 
 	return b.String()
@@ -156,7 +182,7 @@ func formatLogLine(r parser.Record, maxWidth int, highlights []HighlightTerm) st
 
 	// Source file indicator (multi-file mode)
 	if src, ok := r.Fields["source"]; ok {
-		srcStyle := lipgloss.NewStyle().Foreground(colorCyan)
+		srcStyle := StyleBase.Copy().Foreground(colorCyan)
 		parts = append(parts, srcStyle.Render("<")+highlightText(src, highlights, srcStyle, "source")+srcStyle.Render(">"))
 		usedWidth += len(src) + 2 + 2
 	}
@@ -202,11 +228,12 @@ func formatLogLine(r parser.Record, maxWidth int, highlights []HighlightTerm) st
 		if remaining > 0 && len(msg) > remaining {
 			msg = msg[:remaining-1] + "…"
 		}
-		msgStyle := lipgloss.NewStyle().Foreground(colorWhite)
+		msgStyle := StyleBase.Copy().Foreground(colorWhite)
 		parts = append(parts, highlightText(msg, highlights, msgStyle, "message"))
 	}
 
-	line := strings.Join(parts, "  ")
+	sep := StyleBase.Render("  ")
+	line := strings.Join(parts, sep)
 
 	// Render extras with highlighting on values
 	for _, e := range extras {
@@ -214,4 +241,139 @@ func formatLogLine(r parser.Record, maxWidth int, highlights []HighlightTerm) st
 	}
 
 	return line
+}
+
+// viewColumns renders the log view in column/table mode.
+func (lv *LogView) viewColumns() string {
+	var b strings.Builder
+
+	// Header row
+	header := lv.formatTableRow(lv.columns, lv.colWidths, true)
+	b.WriteString(StyleTitle.Render(header))
+	b.WriteString("\n")
+
+	// Data rows (height-1 because header takes one line)
+	dataHeight := lv.height - 1
+	end := lv.offset + dataHeight
+	if end > len(lv.results) {
+		end = len(lv.results)
+	}
+
+	for i := lv.offset; i < end; i++ {
+		recIdx := lv.results[i]
+		r := lv.records[recIdx]
+		vals := lv.getColumnValues(r)
+		line := lv.formatTableRow(vals, lv.colWidths, false)
+
+		if i == lv.cursor {
+			line = StyleHighlight.Width(lv.width).Render(line)
+		}
+
+		b.WriteString(line)
+		if i < end-1 {
+			b.WriteString("\n")
+		}
+	}
+
+	// Pad remaining lines
+	rendered := end - lv.offset + 1 // +1 for header
+	for i := rendered; i < lv.height; i++ {
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// getColumnValues extracts field values for each column from a record.
+// Handles pseudo-columns: timestamp, level, message.
+func (lv *LogView) getColumnValues(r parser.Record) []string {
+	vals := make([]string, len(lv.columns))
+	for i, col := range lv.columns {
+		switch col {
+		case "timestamp", "time", "ts":
+			if !r.Timestamp.IsZero() {
+				vals[i] = r.Timestamp.Format("2006-01-02 15:04:05")
+			}
+		case "level":
+			vals[i] = strings.ToUpper(r.Level)
+		case "message", "msg":
+			vals[i] = r.Message
+			// Strip to first line
+			if idx := strings.IndexByte(vals[i], '\n'); idx >= 0 {
+				vals[i] = vals[i][:idx]
+			}
+		default:
+			vals[i] = r.Fields[col]
+		}
+	}
+	return vals
+}
+
+// formatTableRow formats a row of values with fixed column widths.
+func (lv *LogView) formatTableRow(vals []string, widths []int, isHeader bool) string {
+	var parts []string
+	for i, v := range vals {
+		w := 10
+		if i < len(widths) {
+			w = widths[i]
+		}
+		if len(v) > w {
+			v = v[:w-1] + "…"
+		}
+		parts = append(parts, fmt.Sprintf("%-*s", w, v))
+	}
+	return strings.Join(parts, "  ")
+}
+
+// computeColumnWidths auto-sizes columns by sampling the first 100 visible records.
+func (lv *LogView) computeColumnWidths() {
+	if len(lv.columns) == 0 {
+		lv.colWidths = nil
+		return
+	}
+
+	lv.colWidths = make([]int, len(lv.columns))
+	// Start with header widths
+	for i, col := range lv.columns {
+		lv.colWidths[i] = len(col)
+	}
+
+	// Sample first 100 results
+	sampleSize := 100
+	if sampleSize > len(lv.results) {
+		sampleSize = len(lv.results)
+	}
+	for j := 0; j < sampleSize; j++ {
+		r := lv.records[lv.results[j]]
+		vals := lv.getColumnValues(r)
+		for i, v := range vals {
+			if len(v) > lv.colWidths[i] {
+				lv.colWidths[i] = len(v)
+			}
+		}
+	}
+
+	// Cap each column width and compute total
+	maxColWidth := 50
+	totalWidth := 0
+	for i := range lv.colWidths {
+		if lv.colWidths[i] > maxColWidth {
+			lv.colWidths[i] = maxColWidth
+		}
+		if lv.colWidths[i] < 4 {
+			lv.colWidths[i] = 4
+		}
+		totalWidth += lv.colWidths[i] + 2 // +2 for separator
+	}
+
+	// If total exceeds available width, shrink proportionally
+	if totalWidth > lv.width && lv.width > 0 {
+		ratio := float64(lv.width) / float64(totalWidth)
+		for i := range lv.colWidths {
+			lv.colWidths[i] = int(float64(lv.colWidths[i]) * ratio)
+			if lv.colWidths[i] < 4 {
+				lv.colWidths[i] = 4
+			}
+		}
+	}
 }

@@ -1,6 +1,9 @@
 package ui
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestQueryBarHistory(t *testing.T) {
 	qb := NewQueryBar()
@@ -95,12 +98,12 @@ func TestQueryBarHistoryIgnoresEmpty(t *testing.T) {
 func TestQueryBarHistoryCap(t *testing.T) {
 	qb := NewQueryBar()
 
-	for i := 0; i < 150; i++ {
-		qb.PushHistory(string(rune('a' + i%26)))
+	for i := 0; i < 600; i++ {
+		qb.PushHistory(fmt.Sprintf("query%d", i))
 	}
 
-	if len(qb.history) > 100 {
-		t.Errorf("History length = %d, should be capped at 100", len(qb.history))
+	if len(qb.history) > 500 {
+		t.Errorf("History length = %d, should be capped at 500", len(qb.history))
 	}
 }
 

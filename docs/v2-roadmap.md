@@ -11,34 +11,9 @@
 | v0.5.0 | Multi-file support | Merged timeline from multiple files, `source:filename` queries |
 | v0.6.0 | Search UX | Match highlighting, field auto-complete with ghost text, demo GIF |
 | v0.6.1 | Code quality | Go 1.22, fix Bubbletea anti-patterns, remove dead code |
-
-## In Progress
-
-### 🎨 Color Themes
-Auto-detect terminal background and switch between dark/light palettes. Support `--theme` flag for manual override.
-
-### 💾 Persistent Query History
-Save history to `~/.local/share/logq/history` so queries survive across sessions.
+| v0.7.0 | Features | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop |
 
 ## Planned
-
-### High Priority
-
-#### 🍺 Homebrew Distribution
-Publish a Homebrew tap so users can `brew install riccardomerenda/tap/logq` without needing Go installed. Integrate with GoReleaser for automatic formula updates on release.
-
-#### 📊 Aggregations
-Group-by and count operations for quick analytics:
-```
-logq server.log -q "level:error" --group-by service
-logq server.log -q "latency>1000" --group-by path --top 10
-```
-
-#### 📋 Column Mode
-Display structured logs as a configurable table:
-```bash
-logq server.log --columns ts,level,service,message
-```
 
 ### Medium Priority
 

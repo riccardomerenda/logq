@@ -67,23 +67,44 @@ func writeJSON(w io.Writer, records []parser.Record, ids []int) error {
 	return nil
 }
 
+// WriteWithColumns writes matched records using the given columns as header.
+// If columns is nil, falls back to Write().
+func WriteWithColumns(w io.Writer, records []parser.Record, ids []int, format Format, columns []string) error {
+	if len(columns) == 0 {
+		return Write(w, records, ids, format)
+	}
+	if format == FormatCSV {
+		return writeCSVWithColumns(w, records, ids, columns)
+	}
+	return Write(w, records, ids, format)
+}
+
 func writeCSV(w io.Writer, records []parser.Record, ids []int) error {
+	return writeCSVWithColumns(w, records, ids, nil)
+}
+
+func writeCSVWithColumns(w io.Writer, records []parser.Record, ids []int, columns []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
 
-	// Collect all field keys across matched records
-	keySet := make(map[string]bool)
-	for _, id := range ids {
-		for k := range records[id].Fields {
-			keySet[k] = true
+	var keys []string
+	if len(columns) > 0 {
+		keys = columns
+	} else {
+		// Collect all field keys across matched records
+		keySet := make(map[string]bool)
+		for _, id := range ids {
+			for k := range records[id].Fields {
+				keySet[k] = true
+			}
 		}
+		keys = make([]string, 0, len(keySet))
+		for k := range keySet {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 	}
-	keys := make([]string, 0, len(keySet))
-	for k := range keySet {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
 
 	cw := csv.NewWriter(w)
 	defer cw.Flush()

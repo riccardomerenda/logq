@@ -6,8 +6,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
 	"github.com/riccardomerenda/logq/internal/output"
@@ -36,6 +39,10 @@ func main() {
 	outputPath := ""
 	outputFmt := ""
 	countOnly := false
+	themeName := ""
+	groupByField := ""
+	topN := 0
+	var columns []string
 
 	if len(args) > 0 && args[0] == "update" {
 		selfUpdate()
@@ -65,6 +72,31 @@ func main() {
 			}
 		case "--count":
 			countOnly = true
+		case "--theme":
+			if i+1 < len(args) {
+				i++
+				themeName = args[i]
+			}
+		case "--group-by":
+			if i+1 < len(args) {
+				i++
+				groupByField = args[i]
+			}
+		case "--top":
+			if i+1 < len(args) {
+				i++
+				n, err := strconv.Atoi(args[i])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid --top value: %s\n", args[i])
+					os.Exit(1)
+				}
+				topN = n
+			}
+		case "--columns":
+			if i+1 < len(args) {
+				i++
+				columns = strings.Split(args[i], ",")
+			}
 		default:
 			fileArgs = append(fileArgs, args[i])
 		}
@@ -132,9 +164,22 @@ func main() {
 	// Build index
 	idx := index.Build(records)
 
-	// Batch mode: -q flag provided, skip TUI
-	if queryStr != "" || countOnly {
-		runBatch(idx, queryStr, outputPath, outputFmt, countOnly)
+	// Apply theme
+	switch themeName {
+	case "light":
+		ui.ApplyTheme(ui.LightTheme)
+	case "dark":
+		ui.ApplyTheme(ui.DarkTheme)
+	case "auto", "":
+		ui.ApplyTheme(ui.DetectTheme())
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown theme %q (valid: auto, dark, light)\n", themeName)
+		os.Exit(1)
+	}
+
+	// Batch mode: -q flag provided, --group-by, or --count
+	if queryStr != "" || countOnly || groupByField != "" {
+		runBatch(idx, queryStr, outputPath, outputFmt, countOnly, groupByField, topN, columns)
 		return
 	}
 
@@ -144,8 +189,16 @@ func main() {
 		follow = false
 	}
 
+	// Load persistent history
+	histPath := history.HistoryPath()
+	histEntries, _ := history.Load(histPath)
+
 	// Start TUI
 	model := ui.NewModel(idx, filename, fileSize)
+	model.SetHistory(histEntries, histPath)
+	if len(columns) > 0 {
+		model.SetColumns(columns)
+	}
 	if follow && len(fileArgs) == 1 {
 		fr := input.NewFollowReader(fileArgs[0], followOffset)
 		model.SetFollowReader(fr)
@@ -155,6 +208,11 @@ func main() {
 	if err := p.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Deduplicate and cap history on exit
+	if entries, loadErr := history.Load(histPath); loadErr == nil && len(entries) > 0 {
+		_ = history.Save(histPath, entries)
 	}
 }
 
@@ -200,7 +258,7 @@ func readStdin() ([]parser.Record, error) {
 	return records, nil
 }
 
-func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly bool) {
+func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly bool, groupByField string, topN int, columns []string) {
 	// Parse and evaluate query
 	var results []int
 	if queryStr == "" {
@@ -240,7 +298,24 @@ func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnl
 		w = os.Stdout
 	}
 
-	if err := output.Write(w, idx.Records, results, format); err != nil {
+	// Aggregation mode
+	if groupByField != "" {
+		groups := output.GroupBy(idx.Records, results, groupByField)
+		groups = output.TopN(groups, topN)
+		if err := output.WriteGroups(w, groups, format); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Regular output (with optional column filtering)
+	if len(columns) > 0 {
+		err = output.WriteWithColumns(w, idx.Records, results, format, columns)
+	} else {
+		err = output.Write(w, idx.Records, results, format)
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
 		os.Exit(1)
 	}
@@ -290,6 +365,10 @@ Options:
   -o <file>            Write results to file (use with -q)
   --format <fmt>       Output format: raw (default), json, csv
   --count              Print match count only (use with -q)
+  --theme <name>       Color theme: auto (default), dark, light
+  --group-by <field>   Group results by field and show counts (batch mode)
+  --top <n>            Show only top N groups (use with --group-by)
+  --columns <fields>   Comma-separated list of fields to display as columns
   -h, --help           Show this help
   -v, --version        Show version
 

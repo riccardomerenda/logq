@@ -87,7 +87,8 @@ func (h *Histogram) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(StyleTitle.Render("  Timeline") + "\n")
+	titleLine := padLine(StyleTitle.Render("  Timeline"), h.width)
+	b.WriteString(titleLine + "\n")
 
 	displayCount := h.height - 2
 	if displayCount > len(h.buckets) {
@@ -117,12 +118,15 @@ func (h *Histogram) View() string {
 
 		count := fmt.Sprintf("%d", bucket.Count)
 
-		line := StyleHistLabel.Render(label) + " " + bar + " " + StyleDim.Render(count)
+		sp := StyleBase.Render(" ")
+		line := StyleHistLabel.Render(label) + sp + bar + sp + StyleDim.Render(count)
 
 		if h.focused && i == h.cursor {
 			line = StyleHighlight.Width(h.width).Render(
 				label + " " + strings.Repeat("█", barLen) + " " + count,
 			)
+		} else {
+			line = padLine(line, h.width)
 		}
 
 		b.WriteString(line)
@@ -131,9 +135,11 @@ func (h *Histogram) View() string {
 		}
 	}
 
-	// Pad remaining lines
+	// Pad remaining lines with background
+	emptyLine := StyleBase.Render(strings.Repeat(" ", h.width))
 	for i := displayCount; i < h.height-2; i++ {
 		b.WriteString("\n")
+		b.WriteString(emptyLine)
 	}
 
 	return b.String()

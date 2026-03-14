@@ -12,6 +12,26 @@ archives:
       - goos: windows
         format: zip
 
+brews:
+  - repository:
+      owner: riccardomerenda
+      name: homebrew-tap
+    homepage: https://github.com/riccardomerenda/logq
+    description: "Fast, interactive log explorer for the terminal"
+    license: "MIT"
+    install: |
+      bin.install "logq"
+    test: |
+      system "#{bin}/logq", "--version"
+
+scoops:
+  - repository:
+      owner: riccardomerenda
+      name: scoop-bucket
+    homepage: https://github.com/riccardomerenda/logq
+    description: "Fast, interactive log explorer for the terminal"
+    license: "MIT"
+
 release:
   github:
     owner: riccardomerenda
