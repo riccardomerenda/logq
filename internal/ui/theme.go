@@ -93,6 +93,9 @@ var (
 )
 
 func init() {
+	// Force truecolor so hex colors render accurately in terminals
+	// (e.g. WSL in Windows Terminal) where auto-detection falls short.
+	lipgloss.SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DarkTheme)
 }
 
