@@ -14,11 +14,17 @@ type AliasEntry struct {
 	Columns []string
 }
 
+// TraceConfig holds settings for trace/correlation ID following.
+type TraceConfig struct {
+	IDFields []string
+}
+
 // Config holds settings loaded from a .logq.toml file.
 type Config struct {
 	Theme   string
 	Columns []string
 	Aliases map[string]AliasEntry
+	Trace   TraceConfig
 }
 
 // rawConfig mirrors the TOML structure for decoding.
@@ -26,6 +32,9 @@ type rawConfig struct {
 	Theme   string                 `toml:"theme"`
 	Columns []string               `toml:"columns"`
 	Aliases map[string]interface{} `toml:"aliases"`
+	Trace   struct {
+		IDFields []string `toml:"id_fields"`
+	} `toml:"trace"`
 }
 
 // FindConfig searches for .logq.toml starting from the current directory
@@ -79,6 +88,7 @@ func Parse(content string) (*Config, error) {
 		Theme:   raw.Theme,
 		Columns: raw.Columns,
 		Aliases: make(map[string]AliasEntry),
+		Trace:   TraceConfig{IDFields: raw.Trace.IDFields},
 	}
 
 	for name, val := range raw.Aliases {
@@ -128,5 +138,10 @@ func ScaffoldTemplate() string {
 # [aliases.oncall]
 # query = "level:error AND last:15m"
 # columns = ["timestamp", "service", "message"]
+
+# Trace following — customize which fields are treated as trace/correlation IDs
+# Default: trace_id, request_id, correlation_id, span_id, x_request_id
+# [trace]
+# id_fields = ["trace_id", "request_id", "correlation_id"]
 `
 }

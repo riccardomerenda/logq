@@ -7,14 +7,15 @@ import (
 
 // StatusBar renders the bottom status line.
 type StatusBar struct {
-	matchCount int
-	totalCount int
-	queryTime  time.Duration
-	filename   string
-	fileSize   string
-	following  bool
-	flashMsg   string // temporary message (cleared after one render)
-	width      int
+	matchCount   int
+	totalCount   int
+	queryTime    time.Duration
+	filename     string
+	fileSize     string
+	following    bool
+	traceActive  bool
+	flashMsg     string // temporary message (cleared after one render)
+	width        int
 }
 
 // NewStatusBar creates a new status bar.
@@ -58,8 +59,15 @@ func (sb *StatusBar) View() string {
 	if sb.following {
 		follow = "  [following]"
 	}
+	traceTag := ""
+	if sb.traceActive {
+		traceTag = "  [trace]"
+	}
 	help := "  / filter  s save  q quit"
+	if sb.traceActive {
+		help = "  / filter  T clear trace  s save  q quit"
+	}
 
-	content := left + middle + right + follow + help
+	content := left + middle + right + follow + traceTag + help
 	return StyleStatusBar.Width(sb.width).Render(content)
 }

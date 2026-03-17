@@ -9,20 +9,27 @@ import (
 
 // LogView renders the scrollable log lines panel.
 type LogView struct {
-	records    []parser.Record
-	results    []int // filtered record indices
-	offset     int   // scroll offset
-	cursor     int   // selected line (relative to results)
-	width      int
-	height     int
-	highlights []HighlightTerm
-	columns    []string // column mode field names
-	colWidths  []int    // computed column widths
+	records        []parser.Record
+	results        []int // filtered record indices
+	offset         int   // scroll offset
+	cursor         int   // selected line (relative to results)
+	width          int
+	height         int
+	highlights     []HighlightTerm
+	columns        []string // column mode field names
+	colWidths      []int    // computed column widths
+	traceOriginIdx int      // record index that initiated trace (-1 when inactive)
 }
 
 // NewLogView creates a new log view.
 func NewLogView() LogView {
-	return LogView{}
+	return LogView{traceOriginIdx: -1}
+}
+
+// SetTraceOrigin sets the record index that originated a trace filter.
+// Pass -1 to clear.
+func (lv *LogView) SetTraceOrigin(idx int) {
+	lv.traceOriginIdx = idx
 }
 
 // SetSize updates the viewport dimensions.
@@ -134,16 +141,24 @@ func (lv *LogView) View() string {
 		end = len(lv.results)
 	}
 
+	traceMarker := StyleBase.Copy().Foreground(colorPurple).Bold(true)
 	for i := lv.offset; i < end; i++ {
 		recIdx := lv.results[i]
 		r := lv.records[recIdx]
-		line := formatLogLine(r, lv.width, lv.highlights)
+		line := formatLogLine(r, lv.width-2, lv.highlights)
+
+		// Trace origin gutter marker
+		gutter := "  "
+		if recIdx == lv.traceOriginIdx {
+			gutter = traceMarker.Render("> ")
+		}
 
 		if i == lv.cursor {
-			line = StyleHighlight.Width(lv.width).Render(line)
+			line = StyleHighlight.Width(lv.width - 2).Render(line)
 		} else {
-			line = padLine(line, lv.width)
+			line = padLine(line, lv.width-2)
 		}
+		line = gutter + line
 
 		b.WriteString(line)
 		if i < end-1 {

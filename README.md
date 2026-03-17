@@ -47,6 +47,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Persistent query history** &#8212; queries are saved across sessions; Up/Down arrows to recall
 - **Query aliases** &#8212; `@err`, `@slow`, `@warn` built-in shortcuts, plus custom aliases via `.logq.toml`
 - **Config file** &#8212; per-project `.logq.toml` for theme, columns, and custom aliases
+- **Trace following** &#8212; press `t` on any record to follow its trace/request ID across all files
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text; config file is optional
 - **Single binary** &#8212; no dependencies, just run it
@@ -232,6 +233,8 @@ See the [full query reference](docs/query-syntax.md) for details.
 | `Home` / `End` | Jump to start / end |
 | `Enter` | Show full record detail |
 | `c` | Copy raw record to clipboard (in detail view) |
+| `t` | Follow trace/request ID (in detail view) |
+| `T` | Clear trace filter and restore previous query |
 | `s` | Save filtered results to file |
 | `Escape` | Clear filter / close detail overlay |
 | `Tab` | Toggle focus between log view and histogram |
@@ -318,12 +321,12 @@ For unstructured plain text logs, logq extracts:
 | Match highlighting, field auto-complete | v0.6 |
 | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop | v0.7 |
 | Config file (`.logq.toml`), query aliases (`@err`, `@slow`, custom) | v0.8 |
+| Trace following — press `t` to follow trace/request IDs across files | v0.9 |
 
 ### 🚧 Up Next
 
 | Version | Feature | Description |
 |---------|---------|-------------|
-| v0.9 | 🔗 Trace following | Press `t` on any record to follow its trace/request ID across all files |
 | v1.0 | 🧠 Pattern clustering & 🔖 Bookmarks | Auto-group similar log lines by template; mark and navigate interesting records |
 
 ## Building From Source
@@ -368,6 +371,7 @@ logq/
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
 │   ├── config/                 # .logq.toml parser with auto-discovery
 │   ├── alias/                  # Query alias registry and expansion
+│   ├── trace/                  # Trace/correlation ID detection and following
 │   ├── history/                # Persistent query history
 │   ├── output/                 # Export writers (raw, JSON, CSV, aggregations)
 │   └── ui/                     # Bubbletea TUI components

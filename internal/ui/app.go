@@ -17,6 +17,7 @@ import (
 	"github.com/riccardomerenda/logq/internal/output"
 	"github.com/riccardomerenda/logq/internal/parser"
 	"github.com/riccardomerenda/logq/internal/query"
+	"github.com/riccardomerenda/logq/internal/trace"
 )
 
 // followTickMsg triggers a check for new file content.
@@ -79,6 +80,12 @@ type Model struct {
 
 	// Aliases
 	aliases *alias.Registry
+
+	// Trace following
+	traceFields    []string // ID field names to detect
+	traceActive    bool
+	traceOriginIdx int    // record index that started the trace
+	prevQuery      string // query before trace was activated
 }
 
 // NewModel creates a new app model.
@@ -125,6 +132,11 @@ func (m *Model) SetColumns(cols []string) {
 func (m *Model) SetAliases(reg *alias.Registry) {
 	m.aliases = reg
 	m.queryBar.SetAliases(reg)
+}
+
+// SetTraceFields sets the list of field names to use for trace ID detection.
+func (m *Model) SetTraceFields(fields []string) {
+	m.traceFields = fields
 }
 
 
@@ -191,6 +203,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Detail overlay takes priority
 	if m.showDetail {
+		// Pick mode for trace ID selection
+		if m.detail.pickMode {
+			switch {
+			case key.Matches(msg, m.keys.Up):
+				m.detail.PickUp()
+			case key.Matches(msg, m.keys.Down):
+				m.detail.PickDown()
+			case key.Matches(msg, m.keys.Enter):
+				selected := m.detail.PickSelected()
+				m.detail.ExitPickMode()
+				m.applyTrace(selected)
+			case key.Matches(msg, m.keys.Escape):
+				m.detail.ExitPickMode()
+			}
+			return m, nil
+		}
+
 		if key.Matches(msg, m.keys.Escape) {
 			m.showDetail = false
 		}
@@ -202,6 +231,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.detail.copyMsg = "Copy failed"
 				}
 				return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearCopyMsg{} })
+			}
+		}
+		if key.Matches(msg, m.keys.Trace) {
+			if m.detail.record != nil {
+				ids := trace.DetectIDFields(*m.detail.record, m.traceFields)
+				if len(ids) == 0 {
+					m.detail.copyMsg = "No trace IDs detected"
+					return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearCopyMsg{} })
+				}
+				if len(ids) == 1 {
+					m.applyTrace(ids[0])
+				} else {
+					m.detail.EnterPickMode(ids)
+				}
 			}
 		}
 		return m, nil
@@ -349,6 +392,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearFlashMsg{} })
 		}
 		return m, nil
+	case key.Matches(msg, m.keys.TraceClear):
+		if m.traceActive {
+			m.traceActive = false
+			m.queryBar.SetValue(m.prevQuery)
+			m.logView.SetTraceOrigin(-1)
+			m.executeQuery()
+			m.statusBar.flashMsg = "Trace filter cleared"
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearFlashMsg{} })
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -420,6 +473,24 @@ func (m *Model) updateHistogram() {
 func (m *Model) updateStatusBar() {
 	m.statusBar.Update(len(m.results), m.index.TotalCount, m.queryTime, m.filename, m.fileSize)
 	m.statusBar.following = m.following
+	m.statusBar.traceActive = m.traceActive
+}
+
+// applyTrace activates trace following for the given ID field.
+func (m *Model) applyTrace(id trace.IDField) {
+	// Save current query for restoration with T
+	m.prevQuery = m.queryBar.Value()
+	m.traceActive = true
+	m.traceOriginIdx = m.logView.SelectedRecordIndex()
+	m.logView.SetTraceOrigin(m.traceOriginIdx)
+
+	// Set the trace query and execute
+	q := trace.BuildQuery(id.Name, id.Value)
+	m.queryBar.SetValue(q)
+	m.executeQuery()
+
+	// Close detail view
+	m.showDetail = false
 }
 
 func (m *Model) updateLayout() {

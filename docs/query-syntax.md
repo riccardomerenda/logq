@@ -318,8 +318,47 @@ Settings in `.logq.toml`:
 - **theme** &#8212; `"auto"`, `"dark"`, or `"light"`
 - **columns** &#8212; default columns for TUI and batch mode
 - **[aliases]** &#8212; custom query aliases (see [Query Aliases](#query-aliases))
+- **[trace]** &#8212; customize trace ID field detection (see [Trace Following](#trace-following))
 
 CLI flags always override config file settings.
+
+## Trace Following
+
+Press `t` in the detail view (Enter on any record) to follow its trace/request/correlation ID across all loaded files.
+
+### How It Works
+
+1. Open a record in the detail view (Enter)
+2. Press `t` &#8212; logq auto-detects ID-like fields
+3. If multiple ID fields exist, a pick menu lets you choose
+4. The query is set to `field:value` and the log view shows the full request lifecycle
+5. The originating record is marked with `>` in the gutter
+6. Press `T` to clear the trace filter and restore your previous query
+
+### ID Detection
+
+logq detects trace IDs using two heuristics:
+
+1. **Field name matching** &#8212; fields named `trace_id`, `request_id`, `correlation_id`, `span_id`, `x_request_id` (case-insensitive, supports camelCase, hyphens, dots)
+2. **Value format matching** &#8212; fields whose values look like UUIDs (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) or long hex strings (16+ hex chars)
+
+### Custom ID Fields
+
+Configure which fields are treated as trace IDs in `.logq.toml`:
+
+```toml
+[trace]
+id_fields = ["trace_id", "request_id", "correlation_id", "x_request_id"]
+```
+
+### Batch Mode
+
+Trace following in batch mode uses standard field queries:
+
+```bash
+# Follow a specific trace across multiple files
+logq api.log worker.log db.log -q "trace_id:550e8400-e29b-41d4-a716-446655440000"
+```
 
 ## Query History
 

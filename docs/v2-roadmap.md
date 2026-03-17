@@ -13,39 +13,9 @@
 | v0.6.1 | Code quality | Go 1.22, fix Bubbletea anti-patterns, remove dead code |
 | v0.7.0 | Features | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop |
 | v0.8.0 | Config & aliases | `.logq.toml` config file with auto-discovery, query aliases (`@err`, `@warn`, `@slow`), custom aliases, `logq init` |
+| v0.9.0 | Trace following | `t` in detail view to follow trace/request/correlation IDs across files, `T` to clear, ID pick menu, configurable `[trace]` in `.logq.toml` |
 
 ## Planned
-
-### v0.9.0 — Trace Following
-
-**Theme:** Debug production issues, not just search logs.
-
-#### 🔗 Correlation ID Following
-Select a log entry, press `t`, and logq filters to all entries sharing the same trace/request/correlation ID — across all loaded files.
-
-**How it works:**
-1. User opens a record in the detail view (Enter)
-2. logq auto-detects ID-like fields: `trace_id`, `request_id`, `correlation_id`, `span_id`, `x_request_id`, or any field whose value looks like a UUID / hex string
-3. If multiple ID fields exist, a quick-pick menu appears
-4. Pressing `t` (trace) sets the query to `field:value` and returns to the log view
-5. The full request lifecycle is now visible, sorted by timestamp, across all files
-
-**Why this matters:**
-This is the feature that tools like Datadog, Splunk, and Honeycomb charge for — following a request across services. logq does it locally, instantly, for free. In multi-file mode (`logq api.log worker.log db.log`), this becomes a lightweight distributed trace viewer.
-
-**Scope:**
-- Auto-detect ID fields by name pattern and value format (UUID, hex, etc.)
-- Configurable ID field names in `.logq.toml`:
-  ```toml
-  [trace]
-  id_fields = ["trace_id", "request_id", "correlation_id", "x_request_id"]
-  ```
-- `t` keybinding in detail view to follow trace
-- `T` to clear trace filter and return to previous query
-- Highlight the originating record in the trace view
-- Batch mode: `logq *.log -q "trace_id:abc-123"` (already works, but document the workflow)
-
----
 
 ### v1.0.0 — Pattern Clustering & Polish
 

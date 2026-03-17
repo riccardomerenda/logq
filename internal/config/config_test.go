@@ -142,6 +142,32 @@ columns = ["timestamp", "message"]
 	}
 }
 
+func TestParseTraceConfig(t *testing.T) {
+	cfg, err := Parse(`
+[trace]
+id_fields = ["trace_id", "request_id", "my_custom_id"]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Trace.IDFields) != 3 {
+		t.Fatalf("expected 3 trace ID fields, got %d", len(cfg.Trace.IDFields))
+	}
+	if cfg.Trace.IDFields[0] != "trace_id" {
+		t.Errorf("first field = %q", cfg.Trace.IDFields[0])
+	}
+}
+
+func TestParseEmptyTraceConfig(t *testing.T) {
+	cfg, err := Parse(`theme = "dark"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Trace.IDFields) != 0 {
+		t.Errorf("expected nil/empty trace fields, got %v", cfg.Trace.IDFields)
+	}
+}
+
 func TestScaffoldTemplateNotEmpty(t *testing.T) {
 	tpl := ScaffoldTemplate()
 	if len(tpl) < 100 {

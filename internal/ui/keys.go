@@ -15,8 +15,10 @@ type KeyMap struct {
 	Escape   key.Binding
 	Tab      key.Binding
 	Quit     key.Binding
-	Copy     key.Binding
-	Save     key.Binding
+	Copy       key.Binding
+	Save       key.Binding
+	Trace      key.Binding
+	TraceClear key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings.
@@ -73,6 +75,14 @@ func DefaultKeyMap() KeyMap {
 		Save: key.NewBinding(
 			key.WithKeys("s"),
 			key.WithHelp("s", "save results"),
+		),
+		Trace: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "follow trace"),
+		),
+		TraceClear: key.NewBinding(
+			key.WithKeys("T"),
+			key.WithHelp("T", "clear trace"),
 		),
 	}
 }

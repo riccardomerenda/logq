@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/config"
+	"github.com/riccardomerenda/logq/internal/trace"
 	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
@@ -133,6 +134,12 @@ func main() {
 	// Build alias registry
 	aliasReg := alias.NewRegistry(cfg.Aliases)
 
+	// Resolve trace ID fields
+	traceFields := cfg.Trace.IDFields
+	if len(traceFields) == 0 {
+		traceFields = trace.DefaultIDFields
+	}
+
 	var records []parser.Record
 	var filename string
 	var fileSize string
@@ -237,6 +244,7 @@ func main() {
 	model := ui.NewModel(idx, filename, fileSize)
 	model.SetHistory(histEntries, histPath)
 	model.SetAliases(aliasReg)
+	model.SetTraceFields(traceFields)
 	if len(columns) > 0 {
 		model.SetColumns(columns)
 	}
@@ -418,6 +426,8 @@ Keyboard:
   /          Focus filter bar
   j/k, Up/Dn Scroll logs
   Enter      Show record detail
+  t          Follow trace ID (in detail view)
+  T          Clear trace filter
   s          Save filtered results to file
   Tab        Toggle histogram focus
   Esc        Clear filter / close detail
@@ -433,6 +443,7 @@ Query examples:
   @err                            Alias for level:error OR level:fatal
   @slow AND service:api           Aliases work in compound queries
   source:app.log AND level:error  Filter by source file (multi-file)
+  trace_id:abc-123               Follow a trace across files
 
 Built-in aliases:
   @err     level:error OR level:fatal
