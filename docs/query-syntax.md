@@ -256,6 +256,71 @@ The filter bar supports inline auto-completion for field names and values:
 - **Keywords** &#8212; `AND`, `OR`, `NOT`, and `last` are also completable
 - **Low-cardinality only** &#8212; value suggestions are shown only for fields with 50 or fewer unique values (e.g., `level`, `service`, `method`), not for high-cardinality fields like `request_id`
 
+## Query Aliases
+
+Aliases are shortcuts that expand to longer queries. Type `@name` anywhere in a query.
+
+### Built-in Aliases
+
+| Alias | Expands to |
+|-------|-----------|
+| `@err` | `level:error OR level:fatal` |
+| `@warn` | `level:warn OR level:warning` |
+| `@slow` | `latency>1000` |
+
+### Using Aliases
+
+```
+@err                            # all errors and fatals
+@err AND service:auth           # errors in auth service
+@slow OR @err                   # slow requests or errors
+(@err) AND last:5m              # recent errors
+```
+
+Aliases are expanded before the query is parsed, wrapped in parentheses for correct precedence. `@err AND service:auth` becomes `(level:error OR level:fatal) AND service:auth`.
+
+### Custom Aliases
+
+Define custom aliases in your `.logq.toml` config file:
+
+```toml
+[aliases]
+noisy = "NOT service:healthcheck AND NOT service:ping"
+auth  = "service:auth OR service:gateway"
+
+# Rich alias with column override
+[aliases.oncall]
+query = "level:error AND last:15m"
+columns = ["timestamp", "service", "message"]
+```
+
+Custom aliases override built-in aliases if they share the same name. Aliases can reference other aliases (e.g., `@oncall` can use `@err` internally).
+
+### Alias Autocomplete
+
+In the TUI, typing `@` triggers autocomplete for alias names. Press Tab to accept.
+
+## Config File
+
+logq looks for a `.logq.toml` file in the current directory and walks up to the filesystem root. Run `logq init` to create a starter config.
+
+```toml
+# .logq.toml
+theme = "dark"
+columns = ["timestamp", "level", "service", "message"]
+
+[aliases]
+err   = "level:error OR level:fatal"
+noisy = "NOT service:healthcheck"
+```
+
+Settings in `.logq.toml`:
+- **theme** &#8212; `"auto"`, `"dark"`, or `"light"`
+- **columns** &#8212; default columns for TUI and batch mode
+- **[aliases]** &#8212; custom query aliases (see [Query Aliases](#query-aliases))
+
+CLI flags always override config file settings.
+
 ## Query History
 
 In the TUI, the filter bar (`/`) supports query history:

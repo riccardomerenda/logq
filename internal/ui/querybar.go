@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/index"
 )
 
@@ -18,12 +19,15 @@ type QueryBar struct {
 
 	// Auto-complete
 	completer Completer
+
+	// Aliases
+	aliases *alias.Registry
 }
 
 // NewQueryBar creates a new query bar.
 func NewQueryBar() QueryBar {
 	ti := textinput.New()
-	ti.Placeholder = "Type a filter... (level:error AND latency>500)"
+	ti.Placeholder = "Type a filter... (level:error, @err, @slow)"
 	ti.CharLimit = 500
 	ti.Prompt = "Filter: "
 	ti.PromptStyle = StyleBase.Copy().Foreground(colorPurple)
@@ -87,6 +91,11 @@ func (qb *QueryBar) SetHistory(entries []string) {
 // History returns the current history entries.
 func (qb *QueryBar) History() []string {
 	return qb.history
+}
+
+// SetAliases sets the alias registry for autocomplete.
+func (qb *QueryBar) SetAliases(reg *alias.Registry) {
+	qb.aliases = reg
 }
 
 // PushHistory adds a query to the history (deduplicates consecutive entries).
@@ -153,7 +162,7 @@ func (qb *QueryBar) UpdateCompletions(idx *index.Index) {
 		return
 	}
 
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, qb.aliases)
 	// Don't show completion if the only candidate is exactly what's typed
 	if len(candidates) == 1 && strings.EqualFold(candidates[0], ctx.prefix) {
 		qb.completer.Reset()

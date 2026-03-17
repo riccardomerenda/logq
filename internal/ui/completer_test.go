@@ -3,6 +3,8 @@ package ui
 import (
 	"testing"
 
+	"github.com/riccardomerenda/logq/internal/alias"
+	"github.com/riccardomerenda/logq/internal/config"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/parser"
 )
@@ -85,7 +87,7 @@ func TestComputeCandidatesFieldName(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeFieldName, prefix: "lev"}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	if len(candidates) != 1 || candidates[0] != "level" {
 		t.Errorf("expected [level], got %v", candidates)
@@ -96,7 +98,7 @@ func TestComputeCandidatesFieldNameMultiple(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeFieldName, prefix: "l"}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	// Should include "latency", "level", "last" (keyword)
 	found := map[string]bool{}
@@ -112,7 +114,7 @@ func TestComputeCandidatesFieldValue(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeFieldValue, prefix: "err", field: "level"}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	if len(candidates) != 1 || candidates[0] != "error" {
 		t.Errorf("expected [error], got %v", candidates)
@@ -123,7 +125,7 @@ func TestComputeCandidatesFieldValueAll(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeFieldValue, prefix: "", field: "level"}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	// Should include all level values
 	if len(candidates) < 3 {
@@ -135,7 +137,7 @@ func TestComputeCandidatesKeywords(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeFieldName, prefix: "AN"}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	if len(candidates) != 1 || candidates[0] != "AND" {
 		t.Errorf("expected [AND], got %v", candidates)
@@ -146,7 +148,7 @@ func TestComputeCandidatesNone(t *testing.T) {
 	idx := makeTestIndex()
 
 	ctx := completionContext{mode: completeNone}
-	candidates := computeCandidates(ctx, idx)
+	candidates := computeCandidates(ctx, idx, nil)
 
 	if candidates != nil {
 		t.Errorf("expected nil, got %v", candidates)
@@ -275,5 +277,84 @@ func TestFieldValuesHighCardinality(t *testing.T) {
 	vals := idx.FieldValues("id")
 	if vals != nil {
 		t.Errorf("expected nil for high-cardinality field, got %d values", len(vals))
+	}
+}
+
+func TestExtractCompletionContextAlias(t *testing.T) {
+	tests := []struct {
+		name   string
+		text   string
+		cursor int
+		mode   completeMode
+		prefix string
+	}{
+		{"at sign only", "@", 1, completeAlias, "@"},
+		{"partial alias", "@er", 3, completeAlias, "@er"},
+		{"full alias", "@err", 4, completeAlias, "@err"},
+		{"alias after AND", "level:error AND @sl", 19, completeAlias, "@sl"},
+		{"alias in parens", "(@err", 5, completeAlias, "@err"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := extractCompletionContext(tt.text, tt.cursor)
+			if ctx.mode != tt.mode {
+				t.Errorf("mode = %d, want %d", ctx.mode, tt.mode)
+			}
+			if ctx.prefix != tt.prefix {
+				t.Errorf("prefix = %q, want %q", ctx.prefix, tt.prefix)
+			}
+		})
+	}
+}
+
+func TestComputeCandidatesAlias(t *testing.T) {
+	idx := makeTestIndex()
+	reg := alias.NewRegistry(map[string]config.AliasEntry{
+		"noisy": {Query: "NOT service:healthcheck"},
+	})
+
+	ctx := completionContext{mode: completeAlias, prefix: "@e"}
+	candidates := computeCandidates(ctx, idx, reg)
+
+	if len(candidates) != 1 || candidates[0] != "@err" {
+		t.Errorf("expected [@err], got %v", candidates)
+	}
+}
+
+func TestComputeCandidatesAliasAll(t *testing.T) {
+	idx := makeTestIndex()
+	reg := alias.NewRegistry(nil)
+
+	ctx := completionContext{mode: completeAlias, prefix: "@"}
+	candidates := computeCandidates(ctx, idx, reg)
+
+	// Should include all builtins: @err, @slow, @warn
+	if len(candidates) != 3 {
+		t.Errorf("expected 3 aliases, got %v", candidates)
+	}
+}
+
+func TestComputeCandidatesAliasNilRegistry(t *testing.T) {
+	idx := makeTestIndex()
+
+	ctx := completionContext{mode: completeAlias, prefix: "@e"}
+	candidates := computeCandidates(ctx, idx, nil)
+
+	if candidates != nil {
+		t.Errorf("expected nil, got %v", candidates)
+	}
+}
+
+func TestCompleterGhostSuffixAlias(t *testing.T) {
+	c := Completer{
+		candidates: []string{"@err"},
+		prefix:     "@e",
+		mode:       completeAlias,
+	}
+
+	ghost := c.GhostSuffix()
+	if ghost != "rr" {
+		t.Errorf("ghost = %q, want \"rr\"", ghost)
 	}
 }

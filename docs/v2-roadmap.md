@@ -12,38 +12,100 @@
 | v0.6.0 | Search UX | Match highlighting, field auto-complete with ghost text, demo GIF |
 | v0.6.1 | Code quality | Go 1.22, fix Bubbletea anti-patterns, remove dead code |
 | v0.7.0 | Features | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop |
+| v0.8.0 | Config & aliases | `.logq.toml` config file with auto-discovery, query aliases (`@err`, `@warn`, `@slow`), custom aliases, `logq init` |
 
 ## Planned
 
-### Medium Priority
+### v0.9.0 — Trace Following
+
+**Theme:** Debug production issues, not just search logs.
+
+#### 🔗 Correlation ID Following
+Select a log entry, press `t`, and logq filters to all entries sharing the same trace/request/correlation ID — across all loaded files.
+
+**How it works:**
+1. User opens a record in the detail view (Enter)
+2. logq auto-detects ID-like fields: `trace_id`, `request_id`, `correlation_id`, `span_id`, `x_request_id`, or any field whose value looks like a UUID / hex string
+3. If multiple ID fields exist, a quick-pick menu appears
+4. Pressing `t` (trace) sets the query to `field:value` and returns to the log view
+5. The full request lifecycle is now visible, sorted by timestamp, across all files
+
+**Why this matters:**
+This is the feature that tools like Datadog, Splunk, and Honeycomb charge for — following a request across services. logq does it locally, instantly, for free. In multi-file mode (`logq api.log worker.log db.log`), this becomes a lightweight distributed trace viewer.
+
+**Scope:**
+- Auto-detect ID fields by name pattern and value format (UUID, hex, etc.)
+- Configurable ID field names in `.logq.toml`:
+  ```toml
+  [trace]
+  id_fields = ["trace_id", "request_id", "correlation_id", "x_request_id"]
+  ```
+- `t` keybinding in detail view to follow trace
+- `T` to clear trace filter and return to previous query
+- Highlight the originating record in the trace view
+- Batch mode: `logq *.log -q "trace_id:abc-123"` (already works, but document the workflow)
+
+---
+
+### v1.0.0 — Pattern Clustering & Polish
+
+**Theme:** From tool to platform — intelligent log analysis.
+
+#### 🧠 Log Pattern Clustering
+Automatically group similar log lines by extracting message templates and collapsing variable parts.
+
+**Example:**
+```
+# These three lines:
+Connection timeout to 10.0.1.5:5432 after 3000ms
+Connection timeout to 10.0.2.8:5432 after 5200ms
+Connection timeout to 10.0.1.12:5432 after 4100ms
+
+# Become one cluster:
+Connection timeout to <ip>:<port> after <ms>ms  (3 occurrences)
+```
+
+**Scope:**
+- Template extraction: replace IPs, UUIDs, numbers, paths, timestamps with `<placeholder>`
+- Cluster view mode (toggle with `p` for patterns): shows unique templates ranked by count
+- Drill into a cluster to see all individual entries
+- Batch mode: `logq server.log --patterns` to list top templates
+- Combine with queries: `logq server.log -q "level:error" --patterns` to cluster only errors
 
 #### 🔖 Bookmarks
-Mark interesting records with `m`, navigate between them with `'`, filter to bookmarks-only with `B`. Useful for long debugging sessions.
+Mark interesting records during exploration and navigate between them.
 
-#### 🔍 JSON Drill-Down
-Collapsible nested objects in the detail view. Expand/collapse with Enter, copy dot-paths (`request.headers.host`).
+- `m` — toggle bookmark on current record
+- `'` (quote) — jump to next bookmark
+- `B` — filter to bookmarked records only
+- Bookmarks persist for the session (not across restarts)
 
-#### ⚡ Query Aliases
-Built-in and user-defined shortcuts:
-```
-@err    → level:error OR level:fatal
-@slow   → latency>1000
-```
+#### 🎯 v1.0 Polish
+- Performance validation with multi-GB files
+- Shell completions (bash, zsh, fish)
+- Man page generation
+- `logq --explain "query"` to show how a query will be evaluated
+- Error messages with suggestions ("did you mean `level:error`?")
+
+---
 
 ### Future Ideas
 
 | Idea | Description |
 |------|-------------|
-| Cloud streaming | Direct integration with `kubectl logs`, CloudWatch, etc. |
-| Saved views | Per-project presets: query + columns + theme in `.logq.toml` |
+| Cloud streaming | Direct integration with `kubectl logs`, CloudWatch, GCP Logging |
+| Saved views | Named views combining query + columns + theme, switchable with `1`-`9` |
 | Web playground | Browser-based demo where users can paste logs and try logq |
-| Plugin system | Custom parsers for proprietary log formats |
+| Plugin system | Custom parsers for proprietary log formats (via Wasm or Go plugins) |
+| JSON drill-down | Collapsible nested objects in detail view, copy dot-paths |
+| Live alerts | `logq watch -q "@err" --alert "slack://..."` — trigger on pattern |
 
 ## Design Principles
 
 These guide every decision:
 
-1. **Zero config** — logq works out of the box, always
+1. **Zero config** — logq works out of the box, always. Config files add power, never requirements.
 2. **Single binary** — no runtime dependencies, no setup
 3. **Speed first** — O(1) field lookups, O(log n) range queries, binary search everywhere
 4. **Terminal-native** — no Electron, no browser, no cloud account required
+5. **Local-first** — your logs never leave your machine

@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/riccardomerenda/logq/internal/alias"
+	"github.com/riccardomerenda/logq/internal/config"
 	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
@@ -46,6 +48,18 @@ func main() {
 
 	if len(args) > 0 && args[0] == "update" {
 		selfUpdate()
+		os.Exit(0)
+	}
+	if len(args) > 0 && args[0] == "init" {
+		if _, err := os.Stat(".logq.toml"); err == nil {
+			fmt.Fprintln(os.Stderr, ".logq.toml already exists in this directory")
+			os.Exit(1)
+		}
+		if err := os.WriteFile(".logq.toml", []byte(config.ScaffoldTemplate()), 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating .logq.toml: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Created .logq.toml — edit it to configure logq for this project")
 		os.Exit(0)
 	}
 
@@ -101,6 +115,23 @@ func main() {
 			fileArgs = append(fileArgs, args[i])
 		}
 	}
+
+	// Load config file (.logq.toml)
+	cfgPath, _ := config.FindConfig()
+	cfg, cfgErr := config.Load(cfgPath)
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", cfgErr)
+		cfg = &config.Config{}
+	}
+	// Merge: CLI flags win over config
+	if themeName == "" {
+		themeName = cfg.Theme
+	}
+	if len(columns) == 0 && len(cfg.Columns) > 0 {
+		columns = cfg.Columns
+	}
+	// Build alias registry
+	aliasReg := alias.NewRegistry(cfg.Aliases)
 
 	var records []parser.Record
 	var filename string
@@ -179,6 +210,15 @@ func main() {
 
 	// Batch mode: -q flag provided, --group-by, or --count
 	if queryStr != "" || countOnly || groupByField != "" {
+		// Expand aliases in batch query
+		if queryStr != "" {
+			expanded, err := aliasReg.Expand(queryStr)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Alias error: %v\n", err)
+				os.Exit(1)
+			}
+			queryStr = expanded
+		}
 		runBatch(idx, queryStr, outputPath, outputFmt, countOnly, groupByField, topN, columns)
 		return
 	}
@@ -196,6 +236,7 @@ func main() {
 	// Start TUI
 	model := ui.NewModel(idx, filename, fileSize)
 	model.SetHistory(histEntries, histPath)
+	model.SetAliases(aliasReg)
 	if len(columns) > 0 {
 		model.SetColumns(columns)
 	}
@@ -357,6 +398,7 @@ Usage:
   logq <file.gz>           Open a gzipped log file
   logq -f <file>           Follow a growing file (like tail -f)
   <cmd> | logq             Read from stdin pipe
+  logq init                Create a .logq.toml config file in the current directory
   logq update              Update to the latest version
 
 Options:
@@ -388,7 +430,18 @@ Query examples:
   level:error AND service:auth    Compound query
   NOT service:healthcheck         Negation
   last:5m                         Last 5 minutes
+  @err                            Alias for level:error OR level:fatal
+  @slow AND service:api           Aliases work in compound queries
   source:app.log AND level:error  Filter by source file (multi-file)
+
+Built-in aliases:
+  @err     level:error OR level:fatal
+  @warn    level:warn OR level:warning
+  @slow    latency>1000
+
+Config:
+  Place a .logq.toml in your project root to set defaults (theme, columns,
+  custom aliases). Run "logq init" to create a starter config file.
 `, version)
 }
 

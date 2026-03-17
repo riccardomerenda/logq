@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
 	"github.com/riccardomerenda/logq/internal/input"
@@ -75,6 +76,9 @@ type Model struct {
 
 	// Column mode
 	columns []string
+
+	// Aliases
+	aliases *alias.Registry
 }
 
 // NewModel creates a new app model.
@@ -115,6 +119,12 @@ func (m *Model) SetHistory(entries []string, path string) {
 func (m *Model) SetColumns(cols []string) {
 	m.columns = cols
 	m.logView.SetColumns(cols)
+}
+
+// SetAliases sets the alias registry for query expansion and autocomplete.
+func (m *Model) SetAliases(reg *alias.Registry) {
+	m.aliases = reg
+	m.queryBar.SetAliases(reg)
 }
 
 
@@ -347,15 +357,31 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) executeQuery() {
 	m.queryStr = m.queryBar.Value()
 
+	// Expand aliases before parsing
+	queryToEval := m.queryStr
+	if m.aliases != nil && strings.Contains(queryToEval, "@") {
+		expanded, err := m.aliases.Expand(queryToEval)
+		if err != nil {
+			if m.focus == FocusQueryBar {
+				m.queryBar.SetError("")
+				return
+			}
+			m.queryError = err.Error()
+			m.queryBar.SetError(err.Error())
+			return
+		}
+		queryToEval = expanded
+	}
+
 	start := time.Now()
-	if m.queryStr == "" {
+	if queryToEval == "" {
 		m.results = m.index.AllIDs()
 		m.queryError = ""
 		m.queryBar.SetError("")
 		m.logView.SetHighlights(nil)
 		m.detail.SetHighlights(nil)
 	} else {
-		node, err := query.ParseQuery(m.queryStr)
+		node, err := query.ParseQuery(queryToEval)
 		if err != nil {
 			// While typing, silently keep previous results
 			if m.focus == FocusQueryBar {

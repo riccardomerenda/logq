@@ -45,9 +45,11 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Column mode** &#8212; `--columns timestamp,level,service,message` for a structured table view
 - **Color themes** &#8212; auto-detects dark/light terminal, or set `--theme dark` / `--theme light`
 - **Persistent query history** &#8212; queries are saved across sessions; Up/Down arrows to recall
+- **Query aliases** &#8212; `@err`, `@slow`, `@warn` built-in shortcuts, plus custom aliases via `.logq.toml`
+- **Config file** &#8212; per-project `.logq.toml` for theme, columns, and custom aliases
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
-- **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text
-- **Single binary** &#8212; no dependencies, no config files, just run it
+- **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text; config file is optional
+- **Single binary** &#8212; no dependencies, just run it
 
 ## Install
 
@@ -157,6 +159,40 @@ source~"auth.*" AND latency>500
 
 The source file is shown as `<filename>` in the log view when multiple files are loaded.
 
+## Config File
+
+Drop a `.logq.toml` in your project root to set per-project defaults:
+
+```toml
+theme = "dark"
+columns = ["timestamp", "level", "service", "message"]
+
+[aliases]
+noisy = "NOT service:healthcheck AND NOT service:ping"
+auth  = "service:auth OR service:gateway"
+
+[aliases.oncall]
+query = "level:error AND last:15m"
+columns = ["timestamp", "service", "message"]
+```
+
+Run `logq init` to scaffold a starter config. logq auto-discovers it by walking up from the current directory. CLI flags always override config settings.
+
+### Built-in Aliases
+
+These are always available, even without a config file:
+
+| Alias | Expands to |
+|-------|-----------|
+| `@err` | `level:error OR level:fatal` |
+| `@warn` | `level:warn OR level:warning` |
+| `@slow` | `latency>1000` |
+
+```bash
+logq server.log -q "@err AND service:auth"
+logq server.log -q "@slow" --count
+```
+
 ## Query Syntax
 
 Type queries in the filter bar (`/`). Results update live.
@@ -173,6 +209,7 @@ Type queries in the filter bar (`/`). Results update live.
 | `A OR B` | Either condition matches | `level:error OR level:fatal` |
 | `NOT A` | Negate a condition | `NOT service:healthcheck` |
 | `source:filename` | Filter by source file (multi-file mode) | `source:app.log AND level:error` |
+| `@alias` | Query alias (built-in or custom) | `@err`, `@slow AND service:api` |
 | `(A OR B) AND C` | Group with parentheses | `(level:error OR level:fatal) AND service:api` |
 
 Compound queries work naturally:
@@ -267,7 +304,7 @@ For unstructured plain text logs, logq extracts:
 
 ## Roadmap
 
-> See [docs/v2-roadmap.md](docs/v2-roadmap.md) for full details.
+> See [docs/v2-roadmap.md](docs/v2-roadmap.md) for full details and design notes.
 
 ### ✅ Shipped
 
@@ -280,13 +317,14 @@ For unstructured plain text logs, logq extracts:
 | Multi-file support with merged timeline | v0.5 |
 | Match highlighting, field auto-complete | v0.6 |
 | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop | v0.7 |
+| Config file (`.logq.toml`), query aliases (`@err`, `@slow`, custom) | v0.8 |
 
 ### 🚧 Up Next
 
-| Feature | Description |
-|---------|-------------|
-| 🔖 Bookmarks | Mark and navigate between interesting records |
-| 🔍 JSON drill-down | Collapsible nested objects in detail view |
+| Version | Feature | Description |
+|---------|---------|-------------|
+| v0.9 | 🔗 Trace following | Press `t` on any record to follow its trace/request ID across all files |
+| v1.0 | 🧠 Pattern clustering & 🔖 Bookmarks | Auto-group similar log lines by template; mark and navigate interesting records |
 
 ## Building From Source
 
@@ -328,6 +366,8 @@ logq/
 │   ├── parser/                 # JSON, logfmt, plain text, timestamps
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
+│   ├── config/                 # .logq.toml parser with auto-discovery
+│   ├── alias/                  # Query alias registry and expansion
 │   ├── history/                # Persistent query history
 │   ├── output/                 # Export writers (raw, JSON, CSV, aggregations)
 │   └── ui/                     # Bubbletea TUI components

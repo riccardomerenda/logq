@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/index"
 )
 
@@ -13,6 +14,7 @@ const (
 	completeNone       completeMode = iota
 	completeFieldName               // completing a field name (e.g. "lev" -> "level")
 	completeFieldValue              // completing a field value (e.g. "level:err" -> "level:error")
+	completeAlias                   // completing an alias (e.g. "@er" -> "@err")
 )
 
 // Completer manages inline auto-completion state for the query bar.
@@ -121,6 +123,15 @@ func extractCompletionContext(text string, cursorPos int) completionContext {
 		return completionContext{mode: completeNone}
 	}
 
+	// Check for alias prefix (@)
+	if strings.HasPrefix(token, "@") {
+		return completionContext{
+			mode:       completeAlias,
+			prefix:     token, // include the "@" in prefix for matching
+			tokenStart: tokenStart,
+		}
+	}
+
 	// Check for operators that don't support value completion
 	if strings.ContainsAny(token, "><=~") {
 		return completionContext{mode: completeNone}
@@ -154,7 +165,7 @@ func extractCompletionContext(text string, cursorPos int) completionContext {
 var completableKeywords = []string{"AND", "NOT", "OR", "last"}
 
 // computeCandidates returns matching completions for the given context.
-func computeCandidates(ctx completionContext, idx *index.Index) []string {
+func computeCandidates(ctx completionContext, idx *index.Index, aliases *alias.Registry) []string {
 	switch ctx.mode {
 	case completeFieldName:
 		names := idx.FieldNames()
@@ -168,6 +179,18 @@ func computeCandidates(ctx completionContext, idx *index.Index) []string {
 			return nil
 		}
 		return filterByPrefix(values, ctx.prefix)
+
+	case completeAlias:
+		if aliases == nil {
+			return nil
+		}
+		aliasNames := aliases.Names()
+		// Prefix each name with "@" for display
+		prefixed := make([]string, len(aliasNames))
+		for i, n := range aliasNames {
+			prefixed[i] = "@" + n
+		}
+		return filterByPrefix(prefixed, ctx.prefix)
 
 	default:
 		return nil
