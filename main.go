@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/config"
+	"github.com/riccardomerenda/logq/internal/pattern"
 	"github.com/riccardomerenda/logq/internal/trace"
 	"github.com/riccardomerenda/logq/internal/history"
 	"github.com/riccardomerenda/logq/internal/index"
@@ -42,6 +43,7 @@ func main() {
 	outputPath := ""
 	outputFmt := ""
 	countOnly := false
+	patternsMode := false
 	themeName := ""
 	groupByField := ""
 	topN := 0
@@ -87,6 +89,8 @@ func main() {
 			}
 		case "--count":
 			countOnly = true
+		case "--patterns":
+			patternsMode = true
 		case "--theme":
 			if i+1 < len(args) {
 				i++
@@ -215,8 +219,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Batch mode: -q flag provided, --group-by, or --count
-	if queryStr != "" || countOnly || groupByField != "" {
+	// Batch mode: -q flag provided, --group-by, --count, or --patterns
+	if queryStr != "" || countOnly || groupByField != "" || patternsMode {
 		// Expand aliases in batch query
 		if queryStr != "" {
 			expanded, err := aliasReg.Expand(queryStr)
@@ -226,7 +230,7 @@ func main() {
 			}
 			queryStr = expanded
 		}
-		runBatch(idx, queryStr, outputPath, outputFmt, countOnly, groupByField, topN, columns)
+		runBatch(idx, queryStr, outputPath, outputFmt, countOnly, patternsMode, groupByField, topN, columns)
 		return
 	}
 
@@ -307,7 +311,7 @@ func readStdin() ([]parser.Record, error) {
 	return records, nil
 }
 
-func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly bool, groupByField string, topN int, columns []string) {
+func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnly, patternsMode bool, groupByField string, topN int, columns []string) {
 	// Parse and evaluate query
 	var results []int
 	if queryStr == "" {
@@ -345,6 +349,23 @@ func runBatch(idx *index.Index, queryStr, outputPath, outputFmt string, countOnl
 		defer w.Close()
 	} else {
 		w = os.Stdout
+	}
+
+	// Pattern clustering mode
+	if patternsMode {
+		clusters := pattern.Clusterize(idx.Records, results)
+		if topN > 0 && topN < len(clusters) {
+			clusters = clusters[:topN]
+		}
+		patternResults := make([]output.PatternResult, len(clusters))
+		for i, c := range clusters {
+			patternResults[i] = output.PatternResult{Template: c.Template, Count: c.Count}
+		}
+		if err := output.WritePatterns(w, patternResults, format); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	// Aggregation mode
@@ -419,6 +440,7 @@ Options:
   --group-by <field>   Group results by field and show counts (batch mode)
   --top <n>            Show only top N groups (use with --group-by)
   --columns <fields>   Comma-separated list of fields to display as columns
+  --patterns           Show log pattern clusters (batch mode)
   -h, --help           Show this help
   -v, --version        Show version
 
@@ -428,6 +450,10 @@ Keyboard:
   Enter      Show record detail
   t          Follow trace ID (in detail view)
   T          Clear trace filter
+  p          Toggle pattern clustering view
+  m          Toggle bookmark on current record
+  '          Jump to next bookmark
+  B          Filter to bookmarked records only
   s          Save filtered results to file
   Tab        Toggle histogram focus
   Esc        Clear filter / close detail

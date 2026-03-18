@@ -16,6 +16,7 @@ import (
 	"github.com/riccardomerenda/logq/internal/input"
 	"github.com/riccardomerenda/logq/internal/output"
 	"github.com/riccardomerenda/logq/internal/parser"
+	"github.com/riccardomerenda/logq/internal/pattern"
 	"github.com/riccardomerenda/logq/internal/query"
 	"github.com/riccardomerenda/logq/internal/trace"
 )
@@ -86,22 +87,35 @@ type Model struct {
 	traceActive    bool
 	traceOriginIdx int    // record index that started the trace
 	prevQuery      string // query before trace was activated
+
+	// Pattern clustering
+	patternView     PatternView
+	patternMode     bool
+	preDrillResults []int // results before drilling into a cluster
+
+	// Bookmarks
+	bookmarks          map[int]bool
+	bookmarkFilter     bool
+	preBookmarkResults []int
 }
 
 // NewModel creates a new app model.
 func NewModel(idx *index.Index, filename, fileSize string) Model {
 	m := Model{
-		index:     idx,
-		results:   idx.AllIDs(),
-		logView:   NewLogView(),
-		histogram: NewHistogram(),
-		queryBar:  NewQueryBar(),
-		statusBar: NewStatusBar(),
-		detail:    NewDetailView(),
-		keys:      DefaultKeyMap(),
-		filename:  filename,
-		fileSize:  fileSize,
+		index:       idx,
+		results:     idx.AllIDs(),
+		logView:     NewLogView(),
+		histogram:   NewHistogram(),
+		queryBar:    NewQueryBar(),
+		statusBar:   NewStatusBar(),
+		detail:      NewDetailView(),
+		patternView: NewPatternView(),
+		keys:        DefaultKeyMap(),
+		filename:    filename,
+		fileSize:    fileSize,
+		bookmarks:   make(map[int]bool),
 	}
+	m.logView.SetBookmarks(m.bookmarks)
 
 	m.logView.SetResults(idx.Records, m.results)
 	m.updateHistogram()
@@ -315,10 +329,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Search):
+		if m.patternMode {
+			return m, nil // no search in pattern mode
+		}
 		m.focus = FocusQueryBar
 		m.queryBar.Focus()
 		return m, nil
 	case key.Matches(msg, m.keys.Tab):
+		if m.patternMode {
+			return m, nil
+		}
 		if m.focus == FocusLogView {
 			m.focus = FocusHistogram
 			m.histogram.SetFocused(true)
@@ -328,6 +348,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key.Matches(msg, m.keys.Enter):
+		if m.patternMode {
+			// Drill into selected cluster
+			if c := m.patternView.SelectedCluster(); c != nil {
+				m.preDrillResults = m.results
+				m.results = c.RecordIDs
+				m.logView.SetResults(m.index.Records, m.results)
+				m.patternMode = false
+				m.updateHistogram()
+				m.updateStatusBar()
+			}
+			return m, nil
+		}
 		if m.focus == FocusLogView {
 			idx := m.logView.SelectedRecordIndex()
 			if idx >= 0 && idx < len(m.index.Records) {
@@ -355,6 +387,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key.Matches(msg, m.keys.Up):
+		if m.patternMode {
+			m.patternView.ScrollUp(1)
+			return m, nil
+		}
 		if m.focus == FocusHistogram {
 			m.histogram.ScrollUp()
 		} else {
@@ -362,6 +398,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key.Matches(msg, m.keys.Down):
+		if m.patternMode {
+			m.patternView.ScrollDown(1)
+			return m, nil
+		}
 		if m.focus == FocusHistogram {
 			m.histogram.ScrollDown()
 		} else {
@@ -369,21 +409,132 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key.Matches(msg, m.keys.PageUp):
-		m.logView.ScrollUp(m.logView.height)
+		if m.patternMode {
+			m.patternView.ScrollUp(m.patternView.height)
+		} else {
+			m.logView.ScrollUp(m.logView.height)
+		}
 		return m, nil
 	case key.Matches(msg, m.keys.PageDown):
-		m.logView.ScrollDown(m.logView.height)
+		if m.patternMode {
+			m.patternView.ScrollDown(m.patternView.height)
+		} else {
+			m.logView.ScrollDown(m.logView.height)
+		}
 		return m, nil
 	case key.Matches(msg, m.keys.Home):
-		m.logView.GoToStart()
+		if m.patternMode {
+			m.patternView.GoToStart()
+		} else {
+			m.logView.GoToStart()
+		}
 		return m, nil
 	case key.Matches(msg, m.keys.End):
-		m.logView.GoToEnd()
+		if m.patternMode {
+			m.patternView.GoToEnd()
+		} else {
+			m.logView.GoToEnd()
+		}
 		return m, nil
 	case key.Matches(msg, m.keys.Escape):
+		if m.patternMode {
+			if m.preDrillResults != nil {
+				// Restore pre-drill results and re-enter pattern mode
+				m.results = m.preDrillResults
+				m.preDrillResults = nil
+				m.logView.SetResults(m.index.Records, m.results)
+				m.updateHistogram()
+				clusters := pattern.Clusterize(m.index.Records, m.results)
+				m.patternView.SetClusters(clusters, len(m.results))
+				m.patternMode = true
+			} else {
+				m.patternMode = false
+			}
+			m.updateStatusBar()
+			return m, nil
+		}
+		if m.bookmarkFilter {
+			// Restore pre-bookmark results
+			m.results = m.preBookmarkResults
+			m.preBookmarkResults = nil
+			m.bookmarkFilter = false
+			m.logView.SetResults(m.index.Records, m.results)
+			m.updateHistogram()
+			m.updateStatusBar()
+			return m, nil
+		}
 		// Clear the query
 		m.queryBar.SetValue("")
 		m.executeQuery()
+		return m, nil
+	case key.Matches(msg, m.keys.Pattern):
+		if m.patternMode {
+			m.patternMode = false
+		} else {
+			clusters := pattern.Clusterize(m.index.Records, m.results)
+			m.patternView.SetClusters(clusters, len(m.results))
+			m.patternMode = true
+			m.preDrillResults = nil
+		}
+		m.updateStatusBar()
+		return m, nil
+	case key.Matches(msg, m.keys.BookmarkToggle):
+		if m.patternMode {
+			return m, nil
+		}
+		recIdx := m.logView.SelectedRecordIndex()
+		if recIdx >= 0 {
+			if m.bookmarks[recIdx] {
+				delete(m.bookmarks, recIdx)
+			} else {
+				m.bookmarks[recIdx] = true
+			}
+			m.updateStatusBar()
+		}
+		return m, nil
+	case key.Matches(msg, m.keys.BookmarkNext):
+		if m.patternMode || len(m.bookmarks) == 0 {
+			return m, nil
+		}
+		current := m.logView.cursor
+		// Search forward from current+1, then wrap
+		for i := current + 1; i < len(m.results); i++ {
+			if m.bookmarks[m.results[i]] {
+				m.logView.cursor = i
+				m.logView.ensureVisible()
+				return m, nil
+			}
+		}
+		for i := 0; i <= current; i++ {
+			if m.bookmarks[m.results[i]] {
+				m.logView.cursor = i
+				m.logView.ensureVisible()
+				return m, nil
+			}
+		}
+		return m, nil
+	case key.Matches(msg, m.keys.BookmarkFilter):
+		if m.patternMode {
+			return m, nil
+		}
+		if m.bookmarkFilter {
+			m.results = m.preBookmarkResults
+			m.preBookmarkResults = nil
+			m.bookmarkFilter = false
+		} else if len(m.bookmarks) > 0 {
+			m.preBookmarkResults = m.results
+			filtered := make([]int, 0)
+			for _, id := range m.results {
+				if m.bookmarks[id] {
+					filtered = append(filtered, id)
+				}
+			}
+			m.results = filtered
+			m.bookmarkFilter = true
+		}
+		m.logView.SetResults(m.index.Records, m.results)
+		m.updateHistogram()
+		m.updateStatusBar()
 		return m, nil
 	case key.Matches(msg, m.keys.Save):
 		path := m.saveResults()
@@ -474,6 +625,9 @@ func (m *Model) updateStatusBar() {
 	m.statusBar.Update(len(m.results), m.index.TotalCount, m.queryTime, m.filename, m.fileSize)
 	m.statusBar.following = m.following
 	m.statusBar.traceActive = m.traceActive
+	m.statusBar.patternMode = m.patternMode
+	m.statusBar.bookmarkCount = len(m.bookmarks)
+	m.statusBar.bookmarkFilter = m.bookmarkFilter
 }
 
 // applyTrace activates trace following for the given ID field.
@@ -506,6 +660,7 @@ func (m *Model) updateLayout() {
 	contentHeight := m.height - 4 // query bar + status bar + borders
 
 	m.logView.SetSize(logWidth, contentHeight)
+	m.patternView.SetSize(logWidth, contentHeight)
 	m.histogram.SetSize(histWidth, contentHeight)
 	m.queryBar.SetWidth(m.width)
 	m.statusBar.SetSize(m.width)
@@ -580,9 +735,14 @@ func (m Model) View() string {
 		return m.detail.View()
 	}
 
-	// Main layout: log view (left) | histogram (right)
+	// Main layout: log/pattern view (left) | histogram (right)
 	// Manual horizontal join to ensure styled separators on every line
-	logContent := m.logView.View()
+	var logContent string
+	if m.patternMode {
+		logContent = m.patternView.View()
+	} else {
+		logContent = m.logView.View()
+	}
 	histContent := m.histogram.View()
 	logLines := strings.Split(logContent, "\n")
 	histLines := strings.Split(histContent, "\n")

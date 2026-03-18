@@ -17,8 +17,12 @@ type KeyMap struct {
 	Quit     key.Binding
 	Copy       key.Binding
 	Save       key.Binding
-	Trace      key.Binding
-	TraceClear key.Binding
+	Trace          key.Binding
+	TraceClear     key.Binding
+	Pattern        key.Binding
+	BookmarkToggle key.Binding
+	BookmarkNext   key.Binding
+	BookmarkFilter key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings.
@@ -83,6 +87,22 @@ func DefaultKeyMap() KeyMap {
 		TraceClear: key.NewBinding(
 			key.WithKeys("T"),
 			key.WithHelp("T", "clear trace"),
+		),
+		Pattern: key.NewBinding(
+			key.WithKeys("p"),
+			key.WithHelp("p", "toggle patterns"),
+		),
+		BookmarkToggle: key.NewBinding(
+			key.WithKeys("m"),
+			key.WithHelp("m", "toggle bookmark"),
+		),
+		BookmarkNext: key.NewBinding(
+			key.WithKeys("'"),
+			key.WithHelp("'", "next bookmark"),
+		),
+		BookmarkFilter: key.NewBinding(
+			key.WithKeys("B"),
+			key.WithHelp("B", "filter bookmarks"),
 		),
 	}
 }

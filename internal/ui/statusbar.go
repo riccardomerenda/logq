@@ -12,10 +12,13 @@ type StatusBar struct {
 	queryTime    time.Duration
 	filename     string
 	fileSize     string
-	following    bool
-	traceActive  bool
-	flashMsg     string // temporary message (cleared after one render)
-	width        int
+	following      bool
+	traceActive    bool
+	patternMode    bool
+	bookmarkCount  int
+	bookmarkFilter bool
+	flashMsg       string // temporary message (cleared after one render)
+	width          int
 }
 
 // NewStatusBar creates a new status bar.
@@ -63,11 +66,23 @@ func (sb *StatusBar) View() string {
 	if sb.traceActive {
 		traceTag = "  [trace]"
 	}
-	help := "  / filter  s save  q quit"
-	if sb.traceActive {
+	patternTag := ""
+	if sb.patternMode {
+		patternTag = "  [patterns]"
+	}
+	bookmarkTag := ""
+	if sb.bookmarkFilter {
+		bookmarkTag = "  [bookmarks only]"
+	} else if sb.bookmarkCount > 0 {
+		bookmarkTag = fmt.Sprintf("  [%d bookmarks]", sb.bookmarkCount)
+	}
+	help := "  / filter  p patterns  m mark  s save  q quit"
+	if sb.patternMode {
+		help = "  p normal  Enter drill  Esc back  q quit"
+	} else if sb.traceActive {
 		help = "  / filter  T clear trace  s save  q quit"
 	}
 
-	content := left + middle + right + follow + traceTag + help
+	content := left + middle + right + follow + traceTag + patternTag + bookmarkTag + help
 	return StyleStatusBar.Width(sb.width).Render(content)
 }

@@ -18,7 +18,8 @@ type LogView struct {
 	highlights     []HighlightTerm
 	columns        []string // column mode field names
 	colWidths      []int    // computed column widths
-	traceOriginIdx int      // record index that initiated trace (-1 when inactive)
+	traceOriginIdx int          // record index that initiated trace (-1 when inactive)
+	bookmarks      map[int]bool // bookmarked record indices
 }
 
 // NewLogView creates a new log view.
@@ -30,6 +31,11 @@ func NewLogView() LogView {
 // Pass -1 to clear.
 func (lv *LogView) SetTraceOrigin(idx int) {
 	lv.traceOriginIdx = idx
+}
+
+// SetBookmarks sets the bookmark map for gutter rendering.
+func (lv *LogView) SetBookmarks(bm map[int]bool) {
+	lv.bookmarks = bm
 }
 
 // SetSize updates the viewport dimensions.
@@ -142,15 +148,18 @@ func (lv *LogView) View() string {
 	}
 
 	traceMarker := StyleBase.Copy().Foreground(colorPurple).Bold(true)
+	bookmarkMarker := StyleBase.Copy().Foreground(colorGreen).Bold(true)
 	for i := lv.offset; i < end; i++ {
 		recIdx := lv.results[i]
 		r := lv.records[recIdx]
 		line := formatLogLine(r, lv.width-2, lv.highlights)
 
-		// Trace origin gutter marker
+		// Gutter marker: trace origin > bookmark
 		gutter := "  "
 		if recIdx == lv.traceOriginIdx {
 			gutter = traceMarker.Render("> ")
+		} else if lv.bookmarks[recIdx] {
+			gutter = bookmarkMarker.Render("* ")
 		}
 
 		if i == lv.cursor {

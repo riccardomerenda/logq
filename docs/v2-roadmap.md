@@ -14,52 +14,9 @@
 | v0.7.0 | Features | Persistent history, color themes, aggregations, column mode, Homebrew & Scoop |
 | v0.8.0 | Config & aliases | `.logq.toml` config file with auto-discovery, query aliases (`@err`, `@warn`, `@slow`), custom aliases, `logq init` |
 | v0.9.0 | Trace following | `t` in detail view to follow trace/request/correlation IDs across files, `T` to clear, ID pick menu, configurable `[trace]` in `.logq.toml` |
+| v1.0.0 | Pattern clustering & bookmarks | `p` to cluster similar messages by template, drill into clusters, `--patterns` batch mode; `m`/`'`/`B` bookmarks |
 
-## Planned
-
-### v1.0.0 — Pattern Clustering & Polish
-
-**Theme:** From tool to platform — intelligent log analysis.
-
-#### 🧠 Log Pattern Clustering
-Automatically group similar log lines by extracting message templates and collapsing variable parts.
-
-**Example:**
-```
-# These three lines:
-Connection timeout to 10.0.1.5:5432 after 3000ms
-Connection timeout to 10.0.2.8:5432 after 5200ms
-Connection timeout to 10.0.1.12:5432 after 4100ms
-
-# Become one cluster:
-Connection timeout to <ip>:<port> after <ms>ms  (3 occurrences)
-```
-
-**Scope:**
-- Template extraction: replace IPs, UUIDs, numbers, paths, timestamps with `<placeholder>`
-- Cluster view mode (toggle with `p` for patterns): shows unique templates ranked by count
-- Drill into a cluster to see all individual entries
-- Batch mode: `logq server.log --patterns` to list top templates
-- Combine with queries: `logq server.log -q "level:error" --patterns` to cluster only errors
-
-#### 🔖 Bookmarks
-Mark interesting records during exploration and navigate between them.
-
-- `m` — toggle bookmark on current record
-- `'` (quote) — jump to next bookmark
-- `B` — filter to bookmarked records only
-- Bookmarks persist for the session (not across restarts)
-
-#### 🎯 v1.0 Polish
-- Performance validation with multi-GB files
-- Shell completions (bash, zsh, fish)
-- Man page generation
-- `logq --explain "query"` to show how a query will be evaluated
-- Error messages with suggestions ("did you mean `level:error`?")
-
----
-
-### Future Ideas
+## Future Ideas
 
 | Idea | Description |
 |------|-------------|
