@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/riccardomerenda/logq/internal/alias"
 	"github.com/riccardomerenda/logq/internal/config"
+	"github.com/riccardomerenda/logq/internal/diff"
 	"github.com/riccardomerenda/logq/internal/pattern"
 	"github.com/riccardomerenda/logq/internal/trace"
 	"github.com/riccardomerenda/logq/internal/history"
@@ -51,6 +52,10 @@ func main() {
 
 	if len(args) > 0 && args[0] == "update" {
 		selfUpdate()
+		os.Exit(0)
+	}
+	if len(args) > 0 && args[0] == "diff" {
+		runDiff(args[1:])
 		os.Exit(0)
 	}
 	if len(args) > 0 && args[0] == "init" {
@@ -440,6 +445,7 @@ Usage:
   logq <file.gz>           Open a gzipped log file
   logq -f <file>           Follow a growing file (like tail -f)
   <cmd> | logq             Read from stdin pipe
+  logq diff <f1> <f2>      Compare two log files (pattern & level diff)
   logq init                Create a .logq.toml config file in the current directory
   logq update              Update to the latest version
 
@@ -497,6 +503,120 @@ Config:
   Place a .logq.toml in your project root to set defaults (theme, columns,
   custom aliases). Run "logq init" to create a starter config file.
 `, version)
+}
+
+func runDiff(args []string) {
+	var queryStr string
+	var outputFmt string
+	var topN int
+	var threshold float64 = 50.0
+	var fileArgs []string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-q":
+			if i+1 < len(args) {
+				i++
+				queryStr = args[i]
+			}
+		case "--format":
+			if i+1 < len(args) {
+				i++
+				outputFmt = args[i]
+			}
+		case "--top":
+			if i+1 < len(args) {
+				i++
+				n, err := strconv.Atoi(args[i])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid --top value: %s\n", args[i])
+					os.Exit(1)
+				}
+				topN = n
+			}
+		case "--threshold":
+			if i+1 < len(args) {
+				i++
+				f, err := strconv.ParseFloat(args[i], 64)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid --threshold value: %s\n", args[i])
+					os.Exit(1)
+				}
+				threshold = f
+			}
+		default:
+			fileArgs = append(fileArgs, args[i])
+		}
+	}
+
+	if len(fileArgs) != 2 {
+		fmt.Fprintf(os.Stderr, `logq diff — compare two log files
+
+Usage:
+  logq diff <file1> <file2> [options]
+
+Options:
+  -q <query>           Filter both files with the same query
+  --format <fmt>       Output format: table (default), json
+  --top <n>            Show only top N patterns per category
+  --threshold <pct>    Minimum change %% to show (default 50)
+`)
+		os.Exit(1)
+	}
+
+	// Load config for alias expansion
+	cfgPath, _ := config.FindConfig()
+	cfg, cfgErr := config.Load(cfgPath)
+	if cfgErr != nil {
+		cfg = &config.Config{}
+	}
+	aliasReg := alias.NewRegistry(cfg.Aliases)
+
+	if queryStr != "" {
+		expanded, err := aliasReg.Expand(queryStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Alias error: %v\n", err)
+			os.Exit(1)
+		}
+		queryStr = expanded
+	}
+
+	leftRecords, err := readFile(fileArgs[0], false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", fileArgs[0], err)
+		os.Exit(1)
+	}
+	rightRecords, err := readFile(fileArgs[1], false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", fileArgs[1], err)
+		os.Exit(1)
+	}
+
+	leftIdx := index.Build(leftRecords)
+	rightIdx := index.Build(rightRecords)
+
+	var leftIDs, rightIDs []int
+	if queryStr != "" {
+		node, err := query.ParseQuery(queryStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Query error: %v\n", err)
+			os.Exit(1)
+		}
+		leftIDs = query.Evaluate(node, leftIdx)
+		rightIDs = query.Evaluate(node, rightIdx)
+	} else {
+		leftIDs = leftIdx.AllIDs()
+		rightIDs = rightIdx.AllIDs()
+	}
+
+	result := diff.Compare(leftRecords, rightRecords, leftIDs, rightIDs)
+	result.LeftName = filepath.Base(fileArgs[0])
+	result.RightName = filepath.Base(fileArgs[1])
+
+	if err := diff.WriteDiff(os.Stdout, result, outputFmt, topN, threshold); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing diff: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func formatSize(bytes int64) string {

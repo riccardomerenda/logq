@@ -16,6 +16,7 @@
 | v0.9.0 | Trace following | `t` in detail view to follow trace/request/correlation IDs across files, `T` to clear, ID pick menu, configurable `[trace]` in `.logq.toml` |
 | v1.0.0 | Pattern clustering & bookmarks | `p` to cluster similar messages by template, drill into clusters, `--patterns` batch mode; `m`/`'`/`B` bookmarks |
 | v1.1.0 | JSON drill-down & saved views | Collapsible JSON tree in detail view with fold/expand, dot-path copy; `[views]` in `.logq.toml` with `1`-`9` key switching |
+| v1.2.0 | Log diff | `logq diff <f1> <f2>` compares pattern distributions, level changes, new/gone/changed patterns; supports `-q` filtering and JSON output |
 
 ## Future Ideas
 

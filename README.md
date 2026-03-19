@@ -51,6 +51,7 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Saved views** &#8212; define named views in `.logq.toml` with query + columns; switch with `1`-`9` keys, `0` to clear
 - **Trace following** &#8212; press `t` on any record to follow its trace/request ID across all files
 - **Pattern clustering** &#8212; press `p` to group similar log messages by template; drill into clusters with Enter
+- **Log diff** &#8212; `logq diff before.log after.log` compares pattern distributions, level changes, and new/gone patterns
 - **Bookmarks** &#8212; `m` to mark records, `'` to jump between them, `B` to filter to bookmarks only
 - **Multi-line grouping** &#8212; stack traces and multi-line exceptions are grouped into single entries automatically
 - **Zero setup** &#8212; auto-detects JSON, logfmt, and plain text; config file is optional
@@ -143,6 +144,27 @@ logq server.log -q "level:error" --patterns --top 10
 In the TUI, press `s` to save the current filtered results to a file.
 
 The `--columns` flag also works in TUI mode, rendering a structured table view.
+
+## Diff Mode
+
+Compare two log files to see what changed — new patterns, gone patterns, level distribution shifts:
+
+```bash
+# Compare two files
+logq diff before.log after.log
+
+# Filter both files with a query
+logq diff before.log after.log -q "level:error"
+
+# JSON output for scripting
+logq diff before.log after.log --format json
+
+# Show only top 5 patterns per category
+logq diff before.log after.log --top 5
+
+# Lower the change threshold (default 50%)
+logq diff before.log after.log --threshold 20
+```
 
 ## Multiple Files
 
@@ -349,6 +371,7 @@ For unstructured plain text logs, logq extracts:
 | Trace following — press `t` to follow trace/request IDs across files | v0.9 |
 | Pattern clustering, bookmarks | v1.0 |
 | JSON drill-down, saved views | v1.1 |
+| Log diff | v1.2 |
 
 ## Building From Source
 
@@ -391,6 +414,7 @@ logq/
 │   ├── index/                  # In-memory inverted + numeric + time indexes
 │   ├── query/                  # Lexer, recursive descent parser, evaluator
 │   ├── config/                 # .logq.toml parser with auto-discovery
+│   ├── diff/                   # Log file comparison engine
 │   ├── alias/                  # Query alias registry and expansion
 │   ├── trace/                  # Trace/correlation ID detection and following
 │   ├── pattern/                # Log pattern clustering and template extraction
