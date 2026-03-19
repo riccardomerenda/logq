@@ -319,8 +319,31 @@ Settings in `.logq.toml`:
 - **columns** &#8212; default columns for TUI and batch mode
 - **[aliases]** &#8212; custom query aliases (see [Query Aliases](#query-aliases))
 - **[trace]** &#8212; customize trace ID field detection (see [Trace Following](#trace-following))
+- **[views]** &#8212; named saved views (see [Saved Views](#saved-views))
 
 CLI flags always override config file settings.
+
+## Saved Views
+
+Define named views in `.logq.toml` that combine a query with optional column overrides:
+
+```toml
+[views.errors]
+query = "level:error"
+
+[views.oncall]
+query = "level:error AND last:15m"
+columns = ["timestamp", "service", "message"]
+```
+
+In the TUI, press `1`-`9` to switch to a saved view (assigned in alphabetical order by name). Press `0` to clear the active view and return to the default state. The status bar shows `[view: name]` when a view is active.
+
+Views can reference aliases:
+
+```toml
+[views.critical]
+query = "@err AND last:15m"
+```
 
 ## Trace Following
 

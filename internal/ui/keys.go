@@ -10,12 +10,15 @@ type KeyMap struct {
 	PageDown key.Binding
 	Home     key.Binding
 	End      key.Binding
+	Left     key.Binding
+	Right    key.Binding
 	Search   key.Binding
 	Enter    key.Binding
 	Escape   key.Binding
 	Tab      key.Binding
 	Quit     key.Binding
 	Copy       key.Binding
+	CopyPath   key.Binding
 	Save       key.Binding
 	Trace          key.Binding
 	TraceClear     key.Binding
@@ -52,6 +55,14 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("end"),
 			key.WithHelp("end", "go to end"),
 		),
+		Left: key.NewBinding(
+			key.WithKeys("left"),
+			key.WithHelp("left", "collapse"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right"),
+			key.WithHelp("right", "expand"),
+		),
 		Search: key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "filter"),
@@ -75,6 +86,10 @@ func DefaultKeyMap() KeyMap {
 		Copy: key.NewBinding(
 			key.WithKeys("c"),
 			key.WithHelp("c", "copy raw"),
+		),
+		CopyPath: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "copy path"),
 		),
 		Save: key.NewBinding(
 			key.WithKeys("s"),

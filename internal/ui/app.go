@@ -97,6 +97,18 @@ type Model struct {
 	bookmarks          map[int]bool
 	bookmarkFilter     bool
 	preBookmarkResults []int
+
+	// Saved views
+	savedViews       []SavedView
+	currentView      string // active view name
+	currentViewQuery string // query set by the view (to detect manual edits)
+}
+
+// SavedView represents a named saved view from config.
+type SavedView struct {
+	Name    string
+	Query   string
+	Columns []string
 }
 
 // NewModel creates a new app model.
@@ -151,6 +163,11 @@ func (m *Model) SetAliases(reg *alias.Registry) {
 // SetTraceFields sets the list of field names to use for trace ID detection.
 func (m *Model) SetTraceFields(fields []string) {
 	m.traceFields = fields
+}
+
+// SetViews sets the saved views for quick switching with digit keys.
+func (m *Model) SetViews(views []SavedView) {
+	m.savedViews = views
 }
 
 
@@ -232,6 +249,39 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.detail.ExitPickMode()
 			}
 			return m, nil
+		}
+
+		// JSON tree mode navigation
+		if m.detail.IsTreeMode() {
+			switch {
+			case key.Matches(msg, m.keys.Up):
+				m.detail.TreeUp()
+				return m, nil
+			case key.Matches(msg, m.keys.Down):
+				m.detail.TreeDown()
+				return m, nil
+			case key.Matches(msg, m.keys.Enter):
+				m.detail.TreeToggle()
+				return m, nil
+			case key.Matches(msg, m.keys.Left):
+				m.detail.TreeCollapse()
+				return m, nil
+			case key.Matches(msg, m.keys.Right):
+				m.detail.TreeExpand()
+				return m, nil
+			case key.Matches(msg, m.keys.CopyPath):
+				path := m.detail.SelectedDotPath()
+				if path != "" {
+					if copyToClipboard(path) == nil {
+						m.detail.copyMsg = fmt.Sprintf("Copied: %s", path)
+					} else {
+						m.detail.copyMsg = "Copy failed"
+					}
+					return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return clearCopyMsg{} })
+				}
+				return m, nil
+			}
+			// Fall through to common detail keys
 		}
 
 		if key.Matches(msg, m.keys.Escape) {
@@ -555,11 +605,62 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// View switching with digit keys (1-9 to switch, 0 to clear)
+	if len(m.savedViews) > 0 {
+		s := msg.String()
+		if len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
+			idx := int(s[0] - '1')
+			if idx < len(m.savedViews) {
+				m.switchToView(idx)
+			}
+			return m, nil
+		}
+		if s == "0" && m.currentView != "" {
+			m.clearView()
+			return m, nil
+		}
+	}
+
 	return m, nil
+}
+
+func (m *Model) switchToView(idx int) {
+	v := m.savedViews[idx]
+	m.currentView = v.Name
+	m.currentViewQuery = v.Query
+	m.patternMode = false
+	m.preDrillResults = nil
+	m.queryBar.SetValue(v.Query)
+	if len(v.Columns) > 0 {
+		m.logView.SetColumns(v.Columns)
+	} else if len(m.columns) > 0 {
+		m.logView.SetColumns(m.columns)
+	} else {
+		m.logView.SetColumns(nil)
+	}
+	m.executeQuery()
+}
+
+func (m *Model) clearView() {
+	m.currentView = ""
+	m.currentViewQuery = ""
+	m.queryBar.SetValue("")
+	if len(m.columns) > 0 {
+		m.logView.SetColumns(m.columns)
+	} else {
+		m.logView.SetColumns(nil)
+	}
+	m.executeQuery()
 }
 
 func (m *Model) executeQuery() {
 	m.queryStr = m.queryBar.Value()
+
+	// Clear view indicator if query was manually changed
+	if m.currentView != "" && m.queryStr != m.currentViewQuery {
+		m.currentView = ""
+		m.currentViewQuery = ""
+	}
 
 	// Expand aliases before parsing
 	queryToEval := m.queryStr
@@ -628,6 +729,7 @@ func (m *Model) updateStatusBar() {
 	m.statusBar.patternMode = m.patternMode
 	m.statusBar.bookmarkCount = len(m.bookmarks)
 	m.statusBar.bookmarkFilter = m.bookmarkFilter
+	m.statusBar.viewName = m.currentView
 }
 
 // applyTrace activates trace following for the given ID field.

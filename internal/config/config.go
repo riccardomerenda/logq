@@ -19,12 +19,19 @@ type TraceConfig struct {
 	IDFields []string
 }
 
+// ViewEntry represents a saved view with a query and optional column overrides.
+type ViewEntry struct {
+	Query   string
+	Columns []string
+}
+
 // Config holds settings loaded from a .logq.toml file.
 type Config struct {
 	Theme   string
 	Columns []string
 	Aliases map[string]AliasEntry
 	Trace   TraceConfig
+	Views   map[string]ViewEntry
 }
 
 // rawConfig mirrors the TOML structure for decoding.
@@ -35,6 +42,7 @@ type rawConfig struct {
 	Trace   struct {
 		IDFields []string `toml:"id_fields"`
 	} `toml:"trace"`
+	Views map[string]interface{} `toml:"views"`
 }
 
 // FindConfig searches for .logq.toml starting from the current directory
@@ -89,6 +97,7 @@ func Parse(content string) (*Config, error) {
 		Columns: raw.Columns,
 		Aliases: make(map[string]AliasEntry),
 		Trace:   TraceConfig{IDFields: raw.Trace.IDFields},
+		Views:   make(map[string]ViewEntry),
 	}
 
 	for name, val := range raw.Aliases {
@@ -110,6 +119,28 @@ func Parse(content string) (*Config, error) {
 			cfg.Aliases[name] = entry
 		default:
 			return nil, fmt.Errorf("invalid alias %q: expected string or table", name)
+		}
+	}
+
+	for name, val := range raw.Views {
+		switch v := val.(type) {
+		case string:
+			cfg.Views[name] = ViewEntry{Query: v}
+		case map[string]interface{}:
+			entry := ViewEntry{}
+			if q, ok := v["query"].(string); ok {
+				entry.Query = q
+			}
+			if cols, ok := v["columns"].([]interface{}); ok {
+				for _, c := range cols {
+					if s, ok := c.(string); ok {
+						entry.Columns = append(entry.Columns, s)
+					}
+				}
+			}
+			cfg.Views[name] = entry
+		default:
+			return nil, fmt.Errorf("invalid view %q: expected string or table", name)
 		}
 	}
 
@@ -143,5 +174,14 @@ func ScaffoldTemplate() string {
 # Default: trace_id, request_id, correlation_id, span_id, x_request_id
 # [trace]
 # id_fields = ["trace_id", "request_id", "correlation_id"]
+
+# Saved views — switch with 1-9 keys in TUI, 0 to clear
+# Views are assigned to keys 1-9 in alphabetical order by name.
+# [views.errors]
+# query = "level:error"
+#
+# [views.oncall]
+# query = "level:error AND last:15m"
+# columns = ["timestamp", "service", "message"]
 `
 }

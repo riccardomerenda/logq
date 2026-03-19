@@ -252,6 +252,19 @@ func main() {
 	if len(columns) > 0 {
 		model.SetColumns(columns)
 	}
+	if len(cfg.Views) > 0 {
+		names := make([]string, 0, len(cfg.Views))
+		for name := range cfg.Views {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		views := make([]ui.SavedView, len(names))
+		for i, name := range names {
+			v := cfg.Views[name]
+			views[i] = ui.SavedView{Name: name, Query: v.Query, Columns: v.Columns}
+		}
+		model.SetViews(views)
+	}
 	if follow && len(fileArgs) == 1 {
 		fr := input.NewFollowReader(fileArgs[0], followOffset)
 		model.SetFollowReader(fr)
@@ -447,13 +460,17 @@ Options:
 Keyboard:
   /          Focus filter bar
   j/k, Up/Dn Scroll logs
-  Enter      Show record detail
+  Enter      Show record detail / toggle fold (tree view)
+  d          Copy dot-path (in JSON tree view)
+  Left/Right Collapse/expand node (in JSON tree view)
   t          Follow trace ID (in detail view)
   T          Clear trace filter
   p          Toggle pattern clustering view
   m          Toggle bookmark on current record
   '          Jump to next bookmark
   B          Filter to bookmarked records only
+  1-9        Switch to saved view (from .logq.toml)
+  0          Clear saved view
   s          Save filtered results to file
   Tab        Toggle histogram focus
   Esc        Clear filter / close detail

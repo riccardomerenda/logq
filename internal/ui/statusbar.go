@@ -17,6 +17,7 @@ type StatusBar struct {
 	patternMode    bool
 	bookmarkCount  int
 	bookmarkFilter bool
+	viewName       string // active saved view name
 	flashMsg       string // temporary message (cleared after one render)
 	width          int
 }
@@ -76,6 +77,10 @@ func (sb *StatusBar) View() string {
 	} else if sb.bookmarkCount > 0 {
 		bookmarkTag = fmt.Sprintf("  [%d bookmarks]", sb.bookmarkCount)
 	}
+	viewTag := ""
+	if sb.viewName != "" {
+		viewTag = fmt.Sprintf("  [view: %s]", sb.viewName)
+	}
 	help := "  / filter  p patterns  m mark  s save  q quit"
 	if sb.patternMode {
 		help = "  p normal  Enter drill  Esc back  q quit"
@@ -83,6 +88,6 @@ func (sb *StatusBar) View() string {
 		help = "  / filter  T clear trace  s save  q quit"
 	}
 
-	content := left + middle + right + follow + traceTag + patternTag + bookmarkTag + help
+	content := left + middle + right + follow + traceTag + patternTag + bookmarkTag + viewTag + help
 	return StyleStatusBar.Width(sb.width).Render(content)
 }

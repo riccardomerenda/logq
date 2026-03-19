@@ -40,13 +40,15 @@ Debugging with logs today means chaining `grep | jq | less` or scrolling through
 - **Follow mode** &#8212; `logq -f` tails growing files with live updates (like `tail -f`, but queryable)
 - **Time histogram** &#8212; see log volume and error spikes at a glance
 - **Record detail** &#8212; press Enter to inspect any log line, `c` to copy to clipboard
+- **JSON drill-down** &#8212; nested JSON objects are rendered as a collapsible tree; fold/expand with Enter, copy dot-paths with `d`
 - **Export & batch mode** &#8212; `logq -q "level:error" -o errors.jsonl` for scripting, or press `s` to save from the TUI
 - **Aggregations** &#8212; `--group-by service --top 5` for quick field-value summaries
 - **Column mode** &#8212; `--columns timestamp,level,service,message` for a structured table view
 - **Color themes** &#8212; auto-detects dark/light terminal, or set `--theme dark` / `--theme light`
 - **Persistent query history** &#8212; queries are saved across sessions; Up/Down arrows to recall
 - **Query aliases** &#8212; `@err`, `@slow`, `@warn` built-in shortcuts, plus custom aliases via `.logq.toml`
-- **Config file** &#8212; per-project `.logq.toml` for theme, columns, and custom aliases
+- **Config file** &#8212; per-project `.logq.toml` for theme, columns, custom aliases, and saved views
+- **Saved views** &#8212; define named views in `.logq.toml` with query + columns; switch with `1`-`9` keys, `0` to clear
 - **Trace following** &#8212; press `t` on any record to follow its trace/request ID across all files
 - **Pattern clustering** &#8212; press `p` to group similar log messages by template; drill into clusters with Enter
 - **Bookmarks** &#8212; `m` to mark records, `'` to jump between them, `B` to filter to bookmarks only
@@ -181,7 +183,16 @@ auth  = "service:auth OR service:gateway"
 [aliases.oncall]
 query = "level:error AND last:15m"
 columns = ["timestamp", "service", "message"]
+
+[views.errors]
+query = "level:error"
+
+[views.oncall]
+query = "level:error AND last:15m"
+columns = ["timestamp", "service", "message"]
 ```
+
+Views are assigned to keys `1`-`9` in alphabetical order by name. Press `0` to clear the active view.
 
 Run `logq init` to scaffold a starter config. logq auto-discovers it by walking up from the current directory. CLI flags always override config settings.
 
@@ -237,14 +248,18 @@ See the [full query reference](docs/query-syntax.md) for details.
 | `Tab` (in filter bar) | Accept auto-complete suggestion |
 | `PgUp` / `PgDn` | Page scroll |
 | `Home` / `End` | Jump to start / end |
-| `Enter` | Show full record detail |
+| `Enter` | Show full record detail / toggle fold (in tree view) |
 | `c` | Copy raw record to clipboard (in detail view) |
+| `d` | Copy dot-path to clipboard (in JSON tree view) |
+| `←` / `→` | Collapse / expand node (in JSON tree view) |
 | `t` | Follow trace/request ID (in detail view) |
 | `T` | Clear trace filter and restore previous query |
 | `p` | Toggle pattern clustering view |
 | `m` | Toggle bookmark on current record |
 | `'` | Jump to next bookmark |
 | `B` | Filter to bookmarked records only |
+| `1`-`9` | Switch to saved view (from `.logq.toml`) |
+| `0` | Clear saved view, restore default |
 | `s` | Save filtered results to file |
 | `Escape` | Clear filter / close detail overlay |
 | `Tab` | Toggle focus between log view and histogram |
@@ -333,6 +348,7 @@ For unstructured plain text logs, logq extracts:
 | Config file (`.logq.toml`), query aliases (`@err`, `@slow`, custom) | v0.8 |
 | Trace following — press `t` to follow trace/request IDs across files | v0.9 |
 | Pattern clustering, bookmarks | v1.0 |
+| JSON drill-down, saved views | v1.1 |
 
 ## Building From Source
 

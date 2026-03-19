@@ -15,16 +15,15 @@
 | v0.8.0 | Config & aliases | `.logq.toml` config file with auto-discovery, query aliases (`@err`, `@warn`, `@slow`), custom aliases, `logq init` |
 | v0.9.0 | Trace following | `t` in detail view to follow trace/request/correlation IDs across files, `T` to clear, ID pick menu, configurable `[trace]` in `.logq.toml` |
 | v1.0.0 | Pattern clustering & bookmarks | `p` to cluster similar messages by template, drill into clusters, `--patterns` batch mode; `m`/`'`/`B` bookmarks |
+| v1.1.0 | JSON drill-down & saved views | Collapsible JSON tree in detail view with fold/expand, dot-path copy; `[views]` in `.logq.toml` with `1`-`9` key switching |
 
 ## Future Ideas
 
 | Idea | Description |
 |------|-------------|
 | Cloud streaming | Direct integration with `kubectl logs`, CloudWatch, GCP Logging |
-| Saved views | Named views combining query + columns + theme, switchable with `1`-`9` |
 | Web playground | Browser-based demo where users can paste logs and try logq |
 | Plugin system | Custom parsers for proprietary log formats (via Wasm or Go plugins) |
-| JSON drill-down | Collapsible nested objects in detail view, copy dot-paths |
 | Live alerts | `logq watch -q "@err" --alert "slack://..."` — trigger on pattern |
 
 ## Design Principles

@@ -168,6 +168,56 @@ func TestParseEmptyTraceConfig(t *testing.T) {
 	}
 }
 
+func TestParseViews(t *testing.T) {
+	cfg, err := Parse(`
+[views.errors]
+query = "level:error"
+
+[views.slow]
+query = "latency>1000"
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Views) != 2 {
+		t.Fatalf("expected 2 views, got %d", len(cfg.Views))
+	}
+	if cfg.Views["errors"].Query != "level:error" {
+		t.Errorf("errors view query = %q", cfg.Views["errors"].Query)
+	}
+	if cfg.Views["slow"].Query != "latency>1000" {
+		t.Errorf("slow view query = %q", cfg.Views["slow"].Query)
+	}
+}
+
+func TestParseViewsWithColumns(t *testing.T) {
+	cfg, err := Parse(`
+[views.oncall]
+query = "level:error AND last:15m"
+columns = ["timestamp", "service", "message"]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := cfg.Views["oncall"]
+	if v.Query != "level:error AND last:15m" {
+		t.Errorf("oncall query = %q", v.Query)
+	}
+	if len(v.Columns) != 3 || v.Columns[0] != "timestamp" {
+		t.Errorf("oncall columns = %v", v.Columns)
+	}
+}
+
+func TestParseEmptyViews(t *testing.T) {
+	cfg, err := Parse(`theme = "dark"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Views) != 0 {
+		t.Errorf("expected no views, got %d", len(cfg.Views))
+	}
+}
+
 func TestScaffoldTemplateNotEmpty(t *testing.T) {
 	tpl := ScaffoldTemplate()
 	if len(tpl) < 100 {
